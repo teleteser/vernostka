@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Vernostka</title>
+<meta name="description" content="Offline sprava vernostnych kariet">
+<meta name="theme-color" content="#1E3A5F">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vernostka">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ===================== CARDS VIEW ===================== -->
+  <section id="view-cards" class="view active">
+    <header class="topbar">
+      <h1 class="brand" data-i18n="appName">Vernostka</h1>
+    </header>
+
+    <div class="search-row">
+      <div class="search-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input type="search" id="search-input" data-i18n-placeholder="search_placeholder" placeholder="Hladat kartu...">
+      </div>
+      <button id="sort-btn" class="icon-btn" aria-label="Sort" title="Sort">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M6 12h12M10 18h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <div id="category-chips" class="chip-row"></div>
+
+    <div id="cards-list" class="cards-list"></div>
+
+    <div id="empty-state" class="empty-state" hidden>
+      <div class="empty-illustration">
+        <svg width="88" height="88" viewBox="0 0 88 88" fill="none"><rect x="8" y="24" width="72" height="46" rx="8" fill="#1E3A5F"/><rect x="8" y="34" width="72" height="10" fill="#FF7A45"/><circle cx="24" cy="58" r="4" fill="#fff"/><circle cx="36" cy="58" r="4" fill="#fff"/></svg>
+      </div>
+      <h2 data-i18n="empty_title">Vitaj vo Vernostke</h2>
+      <p data-i18n="empty_desc">Tu najdes vsetky svoje vernostne karty na jednom mieste.</p>
+      <button id="empty-add-btn" class="btn btn-primary" data-i18n="add_first_card">Pridat prvu kartu</button>
+    </div>
+
+    <button id="fab-add" class="fab" aria-label="Pridat kartu">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>
+    </button>
+  </section>
+
+  <!-- ===================== SETTINGS VIEW ===================== -->
+  <section id="view-settings" class="view">
+    <header class="topbar">
+      <h1 class="brand" data-i18n="settings_title">Nastavenia</h1>
+    </header>
+    <div class="settings-content">
+
+      <div class="settings-group">
+        <h3 data-i18n="settings_language">Jazyk</h3>
+        <div class="segmented" id="lang-segmented">
+          <button data-value="sk">Slovensky</button>
+          <button data-value="en">English</button>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="settings_theme">Vzhlad</h3>
+        <div class="segmented" id="theme-segmented">
+          <button data-value="light" data-i18n="theme_light">Svetly</button>
+          <button data-value="dark" data-i18n="theme_dark">Tmavy</button>
+          <button data-value="system" data-i18n="theme_system">Podla systemu</button>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="settings_categories">Kategorie</h3>
+        <div id="settings-category-list" class="settings-category-list"></div>
+        <button id="settings-add-category" class="btn btn-ghost" data-i18n="category_add_new">+ Pridat vlastnu kategoriu</button>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="settings_backup">Zaloha a obnovenie</h3>
+        <p class="hint" data-i18n="backup_folder_desc">Automaticka zaloha do priecinka.</p>
+        <button id="choose-folder-btn" class="btn btn-secondary" data-i18n="backup_choose_folder">Vybrat priecinok pre zalohu</button>
+        <p id="folder-status" class="hint hint-success" hidden></p>
+        <p id="last-backup-status" class="hint"></p>
+        <div class="btn-row">
+          <button id="backup-now-btn" class="btn btn-secondary" data-i18n="backup_now">Zalohovat teraz</button>
+          <button id="export-backup-btn" class="btn btn-secondary" data-i18n="backup_export_manual">Exportovat zalohu</button>
+        </div>
+        <button id="import-backup-btn" class="btn btn-ghost" data-i18n="backup_import">Obnovit zo zalohy</button>
+        <input type="file" id="import-file-input" accept="application/json,.json" hidden>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="settings_data">Data</h3>
+        <button id="reset-data-btn" class="btn btn-danger-ghost" data-i18n="settings_reset">Vymazat vsetky data appky</button>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="settings_about">O appke</h3>
+        <p class="hint">Vernostka - offline sprava vernostnych kariet. Ziadny ucet, ziadny cloud, ziadne sledovanie.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== BOTTOM NAV ===================== -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-target="view-cards">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="14" rx="2.5" stroke="currentColor" stroke-width="2"/><path d="M2 9h20" stroke="currentColor" stroke-width="2"/></svg>
+      <span data-i18n="tab_cards">Karty</span>
+    </button>
+    <button class="nav-btn" data-target="view-settings">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span data-i18n="tab_settings">Nastavenia</span>
+    </button>
+  </nav>
+
+  <!-- ===================== ADD/EDIT CARD MODAL ===================== -->
+  <div id="modal-edit" class="modal-full" hidden>
+    <header class="modal-topbar">
+      <button class="icon-btn" id="edit-close-btn">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <h2 id="edit-title" data-i18n="add_card">Pridat kartu</h2>
+      <button class="text-btn" id="edit-save-btn" data-i18n="save">Ulozit</button>
+    </header>
+
+    <div class="modal-body">
+      <div id="capture-tabs" class="segmented segmented-wide">
+        <button data-value="scan" class="active" data-i18n="scan_tab">Skenovat</button>
+        <button data-value="manual" data-i18n="manual_tab">Zadat rucne</button>
+      </div>
+
+      <div id="scan-pane" class="capture-pane">
+        <div class="scan-frame">
+          <video id="scan-video" playsinline muted></video>
+          <div class="scan-reticle"></div>
+        </div>
+        <p class="hint center" data-i18n="scan_hint">Namier fotoaparat na kod.</p>
+        <div class="btn-row center">
+          <button id="switch-camera-btn" class="btn btn-ghost small" data-i18n="scan_switch_camera">Prepnut kameru</button>
+        </div>
+        <div id="camera-denied" class="camera-denied" hidden>
+          <p class="hint"><strong data-i18n="camera_denied_title">Pristup ku kamere nie je povoleny</strong></p>
+          <p class="hint" data-i18n="camera_denied_desc">Povol pristup ku kamere v nastaveniach.</p>
+          <button id="camera-denied-manual-btn" class="btn btn-secondary" data-i18n="use_manual_instead">Zadat kod rucne</button>
+        </div>
+      </div>
+
+      <div id="manual-pane" class="capture-pane" hidden>
+        <div class="code-preview" id="manual-code-preview"></div>
+        <label class="field-label" data-i18n="card_code_label">Cislo / kod karty</label>
+        <input type="text" id="field-code" data-i18n-placeholder="card_code_placeholder" placeholder="Naskenuj alebo zadaj cislo">
+        <label class="field-label" data-i18n="code_type_label">Typ kodu</label>
+        <select id="field-code-type"></select>
+      </div>
+
+      <div class="form-section">
+        <label class="field-label" data-i18n="store_name_label">Nazov obchodu</label>
+        <div class="store-name-row">
+          <div id="store-logo-preview" class="store-logo-preview"></div>
+          <input type="text" id="field-store-name" data-i18n-placeholder="store_name_placeholder" placeholder="napr. Lidl">
+        </div>
+
+        <label class="field-label" data-i18n="category_label">Kategoria</label>
+        <select id="field-category"></select>
+
+        <label class="field-label" data-i18n="note_label">Poznamka (nepovinne)</label>
+        <textarea id="field-note" rows="2" data-i18n-placeholder="note_placeholder" placeholder="napr. PIN..."></textarea>
+
+        <label class="field-label" data-i18n="location_label">Poloha obchodu (nepovinne)</label>
+        <p class="hint" data-i18n="location_permission_note">GPS poloha je nepovinna.</p>
+        <div id="location-list" class="location-list"></div>
+        <button id="add-location-btn" class="btn btn-ghost" data-i18n="add_location">+ Pridat pobocku</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MAP PICKER MODAL ===================== -->
+  <div id="modal-map" class="modal-full" hidden>
+    <header class="modal-topbar">
+      <button class="icon-btn" id="map-close-btn">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <h2 data-i18n="location_label">Poloha obchodu</h2>
+      <button class="text-btn" id="map-save-btn" data-i18n="save">Ulozit</button>
+    </header>
+    <div class="modal-body no-pad">
+      <input type="text" id="location-name-input" class="location-name-input" data-i18n-placeholder="location_name_placeholder" placeholder="napr. Lidl Dunajska Streda">
+      <p class="hint center" data-i18n="map_pick_hint">Klikni na mapu.</p>
+      <div id="map-container"></div>
+      <button id="map-use-current-btn" class="btn btn-ghost" data-i18n="map_use_current">Pouzit moju polohu</button>
+    </div>
+  </div>
+
+  <!-- ===================== CARD DETAIL MODAL ===================== -->
+  <div id="modal-detail" class="modal-full" hidden>
+    <header class="modal-topbar">
+      <button class="icon-btn" id="detail-close-btn">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <h2 id="detail-title">-</h2>
+      <button class="icon-btn" id="detail-edit-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </header>
+    <div class="modal-body">
+      <button id="show-code-btn" class="code-card-btn">
+        <div id="detail-code-mini" class="code-preview"></div>
+        <span class="tap-hint">Tap to show</span>
+      </button>
+
+      <div class="detail-stats">
+        <div><strong id="detail-uses">0</strong><span data-i18n="uses_label">pouzitia</span></div>
+        <div><span data-i18n="last_used">Naposledy</span><strong id="detail-last-used">-</strong></div>
+      </div>
+
+      <div class="detail-section">
+        <h3 id="detail-note-title" data-i18n="note_label" hidden>Poznamka</h3>
+        <p id="detail-note"></p>
+      </div>
+
+      <div class="detail-section">
+        <h3 data-i18n="history_title">Historia pouzitia</h3>
+        <div id="detail-history-list" class="history-list"></div>
+        <button id="clear-history-btn" class="btn btn-danger-ghost small" data-i18n="delete_history_title">Vymazat historiu</button>
+      </div>
+
+      <button id="delete-card-btn" class="btn btn-danger-ghost" data-i18n="delete_card_title">Zmazat kartu</button>
+    </div>
+  </div>
+
+  <!-- ===================== FULLSCREEN CODE VIEW ===================== -->
+  <div id="modal-fullscreen-code" class="fullscreen-code" hidden>
+    <button id="fs-close-btn" class="fs-close-btn" aria-label="Close">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#111" stroke-width="2.4" stroke-linecap="round"/></svg>
+    </button>
+    <div id="fs-store-name" class="fs-store-name"></div>
+    <div id="fs-code-container" class="fs-code-container"></div>
+    <div class="fs-controls">
+      <button id="fs-rotate-btn" class="btn btn-ghost small" data-i18n="fullscreen_rotate">Otocit</button>
+      <input type="range" id="fs-zoom" min="60" max="150" value="100">
+    </div>
+  </div>
+
+  <!-- ===================== GENERIC CONFIRM DIALOG ===================== -->
+  <div id="modal-confirm" class="modal-overlay" hidden>
+    <div class="modal-sheet">
+      <h3 id="confirm-title">-</h3>
+      <p id="confirm-desc">-</p>
+      <div class="btn-row">
+        <button id="confirm-cancel-btn" class="btn btn-ghost" data-i18n="cancel">Zrusit</button>
+        <button id="confirm-ok-btn" class="btn btn-danger" data-i18n="confirm">Potvrdit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== TOAST / BANNER AREA ===================== -->
+  <div id="banner-area"></div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script src="js/i18n.js"></script>
+<script src="js/db.js"></script>
+<script src="js/codegen.js"></script>
+<script src="js/scanner.js"></script>
+<script src="js/geo.js"></script>
+<script src="js/backup.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
