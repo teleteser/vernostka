@@ -46,6 +46,32 @@ const App = {
     this.registerServiceWorker();
     await this.tryRestoreFolderAndCheckBackup();
     this.maybeShowInstallPrompt();
+    this.bindDraftAutosaveGuards();
+    this.bindIOSKeyboardFix();
+  },
+
+  bindDraftAutosaveGuards() {
+    // Best-effort: if the app is backgrounded or closed while a new card is half-filled,
+    // persist it as a draft so nothing typed gets lost.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') this.flushDraftAutosave();
+    });
+    window.addEventListener('pagehide', () => this.flushDraftAutosave());
+  },
+
+  bindIOSKeyboardFix() {
+    // On iOS Safari, the on-screen keyboard can overlap a position:fixed modal without
+    // shrinking the layout viewport, which can push the modal's header (with the Save
+    // button) out of the visible area. Actively resizing the modal to the visual viewport
+    // height keeps the header reachable without needing to scroll or dismiss the keyboard.
+    if (!window.visualViewport) return;
+    const resize = () => {
+      document.querySelectorAll('.modal-full').forEach((m) => {
+        if (!m.hidden) m.style.height = window.visualViewport.height + 'px';
+      });
+    };
+    window.visualViewport.addEventListener('resize', resize);
+    window.visualViewport.addEventListener('scroll', resize);
   },
 
   async loadSettings() {
@@ -193,19 +219,43 @@ const App = {
   renderCardRow(card) {
     const row = document.createElement('div');
     row.className = 'card-row';
+    const bg = card.logoColor || '#1E3A5F';
+    const fg = card.logoTextColor || '#FFFFFF';
+    const logoInner = card.logo
+      ? `<img src="${card.logo}" alt="">`
+      : this.cardAbbreviation(card);
+    const logoStyle = card.logo ? '' : `style="background:${bg};color:${fg};"`;
+    const draftBadge = card.isDraft ? `<span class="draft-badge">${i18n.t('draft_label')}</span>` : '';
+    const displayName = card.storeName && card.storeName.trim() ? this.escapeHtml(card.storeName) : `${i18n.t('draft_label')} ${this._draftDisplayIndex(card)}`;
     row.innerHTML = `
-      <div class="card-logo">${card.logo ? `<img src="${card.logo}" alt="">` : this.initialLetter(card.storeName)}</div>
+      <div class="card-logo" ${logoStyle}>${logoInner}</div>
       <div class="card-row-info">
-        <div class="card-row-name">${this.escapeHtml(card.storeName)}</div>
+        <div class="card-row-name">${displayName}${draftBadge}</div>
         <div class="card-row-meta">${card.useCount || 0} ${i18n.t('uses_label')} · ${this.formatLastUsed(card.lastUsedAt)}</div>
       </div>
       <div class="card-row-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     `;
-    row.addEventListener('click', () => this.openCardDetail(card));
+    row.addEventListener('click', () => {
+      if (card.isDraft) this.openEditCard(card);
+      else this.openCardDetail(card);
+    });
     return row;
   },
 
+  // Assigns a stable "Koncept N" number to unnamed draft cards, based on creation order
+  // among the currently rendered unnamed drafts.
+  _draftDisplayIndex(card) {
+    if (!this._unnamedDraftOrder) this._unnamedDraftOrder = [];
+    const unnamed = this.cards.filter((c) => c.isDraft && (!c.storeName || !c.storeName.trim())).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    const idx = unnamed.findIndex((c) => c.id === card.id);
+    return idx >= 0 ? idx + 1 : 1;
+  },
+
   initialLetter(name) { return (name || '?').trim().charAt(0).toUpperCase(); },
+  cardAbbreviation(card) {
+    if (card.abbreviation && card.abbreviation.trim()) return card.abbreviation.trim().slice(0, 3).toUpperCase();
+    return this.initialLetter(card.storeName);
+  },
   formatLastUsed(ts) {
     if (!ts) return i18n.t('never_used');
     const d = new Date(ts);
@@ -226,17 +276,36 @@ const App = {
       this.editingCard.code = e.target.value;
       this.updateCodeTypeSelectAuto();
       this.renderManualCodePreview();
+      this.scheduleDraftAutosave();
     });
     document.getElementById('field-code-type').addEventListener('change', (e) => {
       this.editingCard.codeType = e.target.value;
       this.renderManualCodePreview();
+      this.scheduleDraftAutosave();
     });
     document.getElementById('field-store-name').addEventListener('input', (e) => {
       this.editingCard.storeName = e.target.value;
+      this.renderStoreSuggestions(e.target.value);
+      this.scheduleDraftAutosave();
     });
     document.getElementById('field-store-name').addEventListener('blur', () => this.tryFetchLogo());
-    document.getElementById('field-category').addEventListener('change', (e) => { this.editingCard.categoryId = e.target.value; });
-    document.getElementById('field-note').addEventListener('input', (e) => { this.editingCard.note = e.target.value; });
+    document.getElementById('field-abbreviation').addEventListener('input', (e) => {
+      this.editingCard.abbreviation = e.target.value;
+      this.renderLogoPreview();
+      this.scheduleDraftAutosave();
+    });
+    document.getElementById('field-logo-color').addEventListener('input', (e) => {
+      this.editingCard.logoColor = e.target.value;
+      this.renderLogoPreview();
+      this.scheduleDraftAutosave();
+    });
+    document.getElementById('field-logo-text-color').addEventListener('input', (e) => {
+      this.editingCard.logoTextColor = e.target.value;
+      this.renderLogoPreview();
+      this.scheduleDraftAutosave();
+    });
+    document.getElementById('field-category').addEventListener('change', (e) => { this.editingCard.categoryId = e.target.value; this.scheduleDraftAutosave(); });
+    document.getElementById('field-note').addEventListener('input', (e) => { this.editingCard.note = e.target.value; this.scheduleDraftAutosave(); });
 
     document.getElementById('add-location-btn').addEventListener('click', () => this.openLocationPicker(null));
     document.getElementById('camera-denied-manual-btn').addEventListener('click', () => this.switchCapturePane('manual'));
@@ -324,12 +393,17 @@ const App = {
       categoryId: this.categories[0] ? this.categories[0].id : null,
       note: '',
       logo: null,
+      logoColor: '#1E3A5F',
+      logoTextColor: '#FFFFFF',
+      abbreviation: '',
       locations: [],
       useCount: 0,
       detailOpenCount: 0,
       lastUsedAt: null,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      isDraft: false
     };
+    this.autosaveEnabled = true;
     document.getElementById('edit-title').textContent = i18n.t('add_card');
     this.fillEditForm();
     this.populateCodeTypeSelect();
@@ -342,7 +416,8 @@ const App = {
     this.editingIsNew = false;
     this.editingCard = JSON.parse(JSON.stringify(card));
     this.editingCard.codeTypeManuallySet = true;
-    document.getElementById('edit-title').textContent = i18n.t('edit');
+    this.autosaveEnabled = !!card.isDraft;
+    document.getElementById('edit-title').textContent = card.isDraft ? i18n.t('add_card') : i18n.t('edit');
     this.fillEditForm();
     this.populateCodeTypeSelect();
     document.getElementById('field-code-type').value = this.editingCard.codeType;
@@ -353,7 +428,11 @@ const App = {
   fillEditForm() {
     document.getElementById('field-code').value = this.editingCard.code || '';
     document.getElementById('field-store-name').value = this.editingCard.storeName || '';
+    document.getElementById('field-abbreviation').value = this.editingCard.abbreviation || '';
+    document.getElementById('field-logo-color').value = this.editingCard.logoColor || '#1E3A5F';
+    document.getElementById('field-logo-text-color').value = this.editingCard.logoTextColor || '#FFFFFF';
     document.getElementById('field-note').value = this.editingCard.note || '';
+    document.getElementById('store-suggestions').innerHTML = '';
     this.renderCategorySelect();
     document.getElementById('field-category').value = this.editingCard.categoryId || '';
     this.renderLogoPreview();
@@ -365,14 +444,56 @@ const App = {
 
   renderLogoPreview() {
     const el = document.getElementById('store-logo-preview');
-    el.innerHTML = this.editingCard.logo ? `<img src="${this.editingCard.logo}" alt="">` : this.initialLetter(this.editingCard.storeName);
+    if (this.editingCard.logo) {
+      el.style.background = '';
+      el.style.color = '';
+      el.innerHTML = `<img src="${this.editingCard.logo}" alt="">`;
+    } else {
+      el.style.background = this.editingCard.logoColor || '#1E3A5F';
+      el.style.color = this.editingCard.logoTextColor || '#FFFFFF';
+      el.textContent = this.cardAbbreviation(this.editingCard);
+    }
+  },
+
+  renderStoreSuggestions(query) {
+    const el = document.getElementById('store-suggestions');
+    const matches = findStoreSuggestions(query);
+    if (!matches.length) { el.innerHTML = ''; return; }
+    el.innerHTML = '';
+    matches.forEach((preset) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'store-suggestion-chip';
+      chip.innerHTML = `<span class="swatch" style="background:${preset.color}"></span>${this.escapeHtml(preset.name)}`;
+      chip.addEventListener('click', async () => {
+        this.editingCard.storeName = preset.name;
+        document.getElementById('field-store-name').value = preset.name;
+        this.editingCard.logoColor = preset.color;
+        this.renderLogoPreview();
+        el.innerHTML = '';
+        this.scheduleDraftAutosave();
+        const dataUrl = await LogoLookup.fetchLogoAsDataUrl(preset.name, preset.domain);
+        if (dataUrl) {
+          this.editingCard.logo = dataUrl;
+          this.renderLogoPreview();
+          this.scheduleDraftAutosave();
+        }
+      });
+      el.appendChild(chip);
+    });
   },
 
   async tryFetchLogo() {
+    document.getElementById('store-suggestions').innerHTML = '';
     if (this.editingCard.logo || !this.editingCard.storeName) return;
-    const dataUrl = await LogoLookup.fetchLogoAsDataUrl(this.editingCard.storeName);
+    const preset = STORE_PRESETS.find((s) => s.name.toLowerCase() === this.editingCard.storeName.trim().toLowerCase());
+    const dataUrl = await LogoLookup.fetchLogoAsDataUrl(this.editingCard.storeName, preset ? preset.domain : null);
     if (dataUrl) {
       this.editingCard.logo = dataUrl;
+      this.renderLogoPreview();
+      this.scheduleDraftAutosave();
+    } else if (preset && !this.editingCard.logoColor) {
+      this.editingCard.logoColor = preset.color;
       this.renderLogoPreview();
     }
   },
@@ -450,13 +571,35 @@ const App = {
       if (!proceed) { this.startScanning(); return; }
     }
     if (navigator.vibrate) navigator.vibrate(60);
+    this.scheduleDraftAutosave();
     this.switchCapturePane('manual');
   },
 
   closeEditModal() {
+    this.flushDraftAutosave();
     this.stopScanning();
     this.hideModal('modal-edit');
     this.editingCard = null;
+  },
+
+  hasDraftContent(card) {
+    return !!((card.storeName && card.storeName.trim()) || (card.code && card.code.trim()));
+  },
+
+  scheduleDraftAutosave() {
+    if (!this.autosaveEnabled || !this.editingCard) return;
+    clearTimeout(this._draftAutosaveTimer);
+    this._draftAutosaveTimer = setTimeout(() => this.flushDraftAutosave(), 1200);
+  },
+
+  flushDraftAutosave() {
+    clearTimeout(this._draftAutosaveTimer);
+    if (!this.autosaveEnabled || !this.editingCard) return;
+    if (!this.hasDraftContent(this.editingCard)) return;
+    const clone = JSON.parse(JSON.stringify(this.editingCard));
+    delete clone.codeTypeManuallySet;
+    clone.isDraft = true;
+    DB.putCard(clone).then(() => { this.renderCardsList(); }).catch((e) => console.warn('draft autosave failed', e));
   },
 
   async saveEditingCard() {
@@ -477,7 +620,10 @@ const App = {
         if (!proceed) return;
       }
     }
+    clearTimeout(this._draftAutosaveTimer);
+    this.autosaveEnabled = false;
     delete c.codeTypeManuallySet;
+    c.isDraft = false;
     await DB.putCard(c);
     this.stopScanning();
     this.hideModal('modal-edit');
@@ -690,8 +836,21 @@ const App = {
     });
 
     document.getElementById('reset-data-btn').addEventListener('click', async () => {
-      const ok = await this.confirmDialog(i18n.t('settings_reset_confirm_title'), i18n.t('settings_reset_confirm_desc'), i18n.t('delete'), i18n.t('cancel'));
-      if (!ok) return;
+      const choice = await this.threeWayDialog(
+        i18n.t('backup_before_reset_title'),
+        i18n.t('backup_before_reset_desc'),
+        [
+          { label: i18n.t('cancel'), value: 'cancel', className: 'btn-ghost' },
+          { label: i18n.t('backup_then_delete'), value: 'backup', className: 'btn-secondary' },
+          { label: i18n.t('delete_without_backup'), value: 'delete', className: 'btn-danger' }
+        ]
+      );
+      if (!choice || choice === 'cancel') return;
+      if (choice === 'backup') {
+        if (Backup.hasActiveFolderPermission()) await Backup.writeBackupToFolder();
+        else await Backup.exportToFile();
+        this.updateBackupStatusUI();
+      }
       await DB.replaceAllCards([]);
       await DB.replaceAllHistory([]);
       await this.renderCardsList();
@@ -853,7 +1012,11 @@ const App = {
   },
 
   // ---------------- Generic UI helpers ----------------
-  showModal(id) { document.getElementById(id).hidden = false; },
+  showModal(id) {
+    const el = document.getElementById(id);
+    el.style.height = '';
+    el.hidden = false;
+  },
   hideModal(id) { document.getElementById(id).hidden = true; },
 
   bindConfirmModal() {

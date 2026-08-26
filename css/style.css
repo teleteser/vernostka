@@ -266,6 +266,17 @@ p { margin: 0.35em 0; }
 }
 .modal-topbar h2 { font-size: 16px; }
 .text-btn { background: none; border: none; color: var(--accent); font-weight: 700; font-size: 15px; padding: 6px 4px; }
+.save-btn-highlight {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 10px;
+  padding: 8px 16px;
+  animation: savePulse 1.6s ease-in-out infinite;
+}
+@keyframes savePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,122,69,0.55); }
+  50% { box-shadow: 0 0 0 7px rgba(255,122,69,0); }
+}
 .modal-body { flex: 1; overflow-y: auto; padding: 18px 20px 40px; -webkit-overflow-scrolling: touch; }
 .modal-body.no-pad { padding: 0; }
 
@@ -290,7 +301,7 @@ p { margin: 0.35em 0; }
 .scan-slow-hint { text-align: center; margin-top: 10px; }
 .scan-slow-hint button { margin-top: 6px; }
 
-.code-preview { display: flex; align-items: center; justify-content: center; min-height: 140px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 14px; }
+.code-preview { display: flex; align-items: center; justify-content: center; min-height: 140px; width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 14px; }
 .code-preview svg, .code-preview img { max-width: 100%; }
 .code-preview .qr-holder { width: 100%; display: flex; align-items: center; justify-content: center; }
 .code-preview.code-square { aspect-ratio: 1 / 1; }
@@ -322,6 +333,39 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 .store-logo-preview { width: 46px; height: 46px; border-radius: 12px; background: var(--surface-2); flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; font-weight: 700; color: var(--primary); }
 .store-logo-preview img { width: 100%; height: 100%; object-fit: cover; }
 
+.store-suggestions { display: flex; gap: 6px; overflow-x: auto; margin-top: 8px; }
+.store-suggestion-chip {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 5px 12px 5px 5px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.store-suggestion-chip .swatch { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; }
+
+.appearance-row { display: flex; gap: 20px; margin-top: 14px; }
+.appearance-field { flex: 1; }
+.appearance-field label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+.color-input-wrap { display: flex; align-items: center; gap: 10px; }
+.color-input-wrap input[type="color"] { width: 42px; height: 42px; border: 1px solid var(--border); border-radius: 10px; padding: 2px; background: var(--surface); }
+
+.draft-badge {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 .form-section { margin-top: 8px; }
 .location-list { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
 .location-row { display: flex; align-items: center; justify-content: space-between; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
@@ -331,7 +375,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 .location-name-input { margin: 14px 20px 10px; width: calc(100% - 40px); }
 #map-container { width: 100%; height: 48vh; }
 
-.code-card-btn { width: 100%; border: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.code-card-btn { width: 100%; border: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
 .tap-hint { font-size: 12.5px; color: var(--text-muted); font-weight: 600; }
 
 .detail-actions-row { display: flex; gap: 10px; margin: 0 0 16px; }

@@ -96,8 +96,8 @@ const LogoLookup = {
     return `${slug}.com`;
   },
 
-  async fetchLogoAsDataUrl(storeName) {
-    const domain = this.guessDomain(storeName);
+  async fetchLogoAsDataUrl(storeName, explicitDomain) {
+    const domain = explicitDomain || this.guessDomain(storeName);
     if (!domain || !navigator.onLine) return null;
     const faviconUrl = `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
     try {

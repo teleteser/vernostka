@@ -116,6 +116,15 @@ const I18N = {
     category_delete_choice_desc: 'Kategoria "{name}" obsahuje karty. Co chces s nimi urobit?',
     category_delete_move: 'Presunut do Ine',
     category_delete_remove_cards: 'Zmazat karty',
+    abbreviation_label: 'Skratka karty',
+    abbreviation_placeholder: 'napr. LI',
+    logo_color_label: 'Farba policka',
+    logo_text_color_label: 'Farba skratky',
+    draft_label: 'Koncept',
+    backup_before_reset_title: 'Vymazat vsetky data?',
+    backup_before_reset_desc: 'Predtym ako vsetko vymazes, odporucame vytvorit zalohu. Co chces urobit?',
+    backup_then_delete: 'Zalohovat a vymazat',
+    delete_without_backup: 'Vymazat bez zalohy',
   },
   en: {
     appName: 'LoyalCards',
@@ -233,6 +242,15 @@ const I18N = {
     category_delete_choice_desc: 'The category "{name}" contains cards. What should happen to them?',
     category_delete_move: 'Move to Other',
     category_delete_remove_cards: 'Delete cards',
+    abbreviation_label: 'Card abbreviation',
+    abbreviation_placeholder: 'e.g. LI',
+    logo_color_label: 'Field color',
+    logo_text_color_label: 'Abbreviation color',
+    draft_label: 'Draft',
+    backup_before_reset_title: 'Erase all data?',
+    backup_before_reset_desc: 'Before erasing everything, we recommend making a backup. What would you like to do?',
+    backup_then_delete: 'Back up and erase',
+    delete_without_backup: 'Erase without backup',
   }
 };
 

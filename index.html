@@ -128,7 +128,7 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
       <h2 id="edit-title" data-i18n="add_card">Pridat kartu</h2>
-      <button class="text-btn" id="edit-save-btn" data-i18n="save">Ulozit</button>
+      <button class="text-btn save-btn-highlight" id="edit-save-btn" data-i18n="save">Ulozit</button>
     </header>
 
     <div class="modal-body">
@@ -170,6 +170,22 @@
         <div class="store-name-row">
           <div id="store-logo-preview" class="store-logo-preview"></div>
           <input type="text" id="field-store-name" data-i18n-placeholder="store_name_placeholder" placeholder="napr. Lidl">
+        </div>
+        <div id="store-suggestions" class="store-suggestions"></div>
+
+        <div class="appearance-row">
+          <div class="appearance-field">
+            <label data-i18n="abbreviation_label">Skratka karty</label>
+            <input type="text" id="field-abbreviation" maxlength="3" data-i18n-placeholder="abbreviation_placeholder" placeholder="napr. LI">
+          </div>
+          <div class="appearance-field">
+            <label data-i18n="logo_color_label">Farba policka</label>
+            <div class="color-input-wrap"><input type="color" id="field-logo-color"></div>
+          </div>
+          <div class="appearance-field">
+            <label data-i18n="logo_text_color_label">Farba skratky</label>
+            <div class="color-input-wrap"><input type="color" id="field-logo-text-color"></div>
+          </div>
         </div>
 
         <div id="edit-danger-actions" class="btn-row" hidden>
@@ -278,6 +294,7 @@
 
 <script src="js/i18n.js"></script>
 <script src="js/db.js"></script>
+<script src="js/stores.js"></script>
 <script src="js/codegen.js"></script>
 <script src="js/scanner.js"></script>
 <script src="js/geo.js"></script>
