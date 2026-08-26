@@ -366,7 +366,7 @@ const App = {
   renderManualCodePreview() {
     const el = document.getElementById('manual-code-preview');
     if (this.editingCard.code) {
-      renderCode(el, this.editingCard.code, this.editingCard.codeType, { height: 90, width: 220 });
+      renderCode(el, this.editingCard.code, this.editingCard.codeType, { height: 120, responsive: true });
     } else {
       el.innerHTML = `<span class="hint">${i18n.t('card_code_placeholder')}</span>`;
     }
@@ -404,6 +404,7 @@ const App = {
       isDraft: false
     };
     this.autosaveEnabled = true;
+    this._editOriginalSnapshot = null;
     document.getElementById('edit-title').textContent = i18n.t('add_card');
     this.fillEditForm();
     this.populateCodeTypeSelect();
@@ -416,6 +417,7 @@ const App = {
     this.editingIsNew = false;
     this.editingCard = JSON.parse(JSON.stringify(card));
     this.editingCard.codeTypeManuallySet = true;
+    this._editOriginalSnapshot = card.isDraft ? null : JSON.parse(JSON.stringify(card));
     this.autosaveEnabled = !!card.isDraft;
     document.getElementById('edit-title').textContent = card.isDraft ? i18n.t('add_card') : i18n.t('edit');
     this.fillEditForm();
@@ -465,22 +467,31 @@ const App = {
       chip.type = 'button';
       chip.className = 'store-suggestion-chip';
       chip.innerHTML = `<span class="swatch" style="background:${preset.color}"></span>${this.escapeHtml(preset.name)}`;
-      chip.addEventListener('click', async () => {
-        this.editingCard.storeName = preset.name;
-        document.getElementById('field-store-name').value = preset.name;
-        this.editingCard.logoColor = preset.color;
-        this.renderLogoPreview();
-        el.innerHTML = '';
-        this.scheduleDraftAutosave();
-        const dataUrl = await LogoLookup.fetchLogoAsDataUrl(preset.name, preset.domain);
-        if (dataUrl) {
-          this.editingCard.logo = dataUrl;
-          this.renderLogoPreview();
-          this.scheduleDraftAutosave();
-        }
+      // Use pointerdown+preventDefault (not click) so the store-name input never blurs
+      // before the selection registers - a blur here would otherwise wipe this very
+      // suggestion list out from under the tap via tryFetchLogo().
+      chip.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        this.selectStoreSuggestion(preset);
       });
       el.appendChild(chip);
     });
+  },
+
+  async selectStoreSuggestion(preset) {
+    this.editingCard.storeName = preset.name;
+    document.getElementById('field-store-name').value = preset.name;
+    this.editingCard.logoColor = preset.color;
+    document.getElementById('field-logo-color').value = preset.color;
+    this.renderLogoPreview();
+    document.getElementById('store-suggestions').innerHTML = '';
+    this.scheduleDraftAutosave();
+    const dataUrl = await LogoLookup.fetchLogoAsDataUrl(preset.name, preset.domain);
+    if (dataUrl) {
+      this.editingCard.logo = dataUrl;
+      this.renderLogoPreview();
+      this.scheduleDraftAutosave();
+    }
   },
 
   async tryFetchLogo() {
@@ -602,6 +613,32 @@ const App = {
     DB.putCard(clone).then(() => { this.renderCardsList(); }).catch((e) => console.warn('draft autosave failed', e));
   },
 
+  DIFF_FIELDS: [
+    { key: 'storeName', labelKey: 'store_name_label' },
+    { key: 'code', labelKey: 'card_code_label' },
+    { key: 'abbreviation', labelKey: 'abbreviation_label' },
+    { key: 'note', labelKey: 'note_label' },
+    { key: 'categoryId', labelKey: 'category_label', isCategory: true }
+  ],
+
+  buildEditDiffText(before, after) {
+    const lines = [];
+    this.DIFF_FIELDS.forEach((f) => {
+      let oldVal = before[f.key] || '';
+      let newVal = after[f.key] || '';
+      if (f.isCategory) {
+        const oldCat = this.categories.find((c) => c.id === oldVal);
+        const newCat = this.categories.find((c) => c.id === newVal);
+        oldVal = oldCat ? this.categoryLabel(oldCat) : '';
+        newVal = newCat ? this.categoryLabel(newCat) : '';
+      }
+      if (oldVal !== newVal) {
+        lines.push(`${i18n.t(f.labelKey)}: "${oldVal || '-'}" > "${newVal || '-'}"`);
+      }
+    });
+    return lines.join('\n');
+  },
+
   async saveEditingCard() {
     const c = this.editingCard;
     if (!c.storeName || !c.storeName.trim() || !c.code || !c.code.trim()) {
@@ -610,7 +647,10 @@ const App = {
     }
     if (this.editingIsNew) {
       const dup = await DB.findByCode(c.code);
-      if (dup) {
+      // Ignore a "duplicate" that is actually our own in-progress draft record (autosave
+      // already persisted it under this same id/code) or any other leftover draft - only
+      // warn about a genuine, different, already-finalized card.
+      if (dup && dup.id !== c.id && !dup.isDraft) {
         const proceed = await this.confirmDialog(
           i18n.t('duplicate_title'),
           i18n.t('duplicate_desc', { name: dup.storeName }),
@@ -625,6 +665,18 @@ const App = {
     delete c.codeTypeManuallySet;
     c.isDraft = false;
     await DB.putCard(c);
+
+    const existingHistory = await DB.getHistoryForCard(c.id);
+    if (!existingHistory.some((h) => h.type === 'created')) {
+      await DB.addHistory({ id: DB.uid(), cardId: c.id, type: 'created', timestamp: c.createdAt || Date.now() });
+    } else if (this._editOriginalSnapshot) {
+      const changes = this.buildEditDiffText(this._editOriginalSnapshot, c);
+      if (changes) {
+        await DB.addHistory({ id: DB.uid(), cardId: c.id, type: 'edited', timestamp: Date.now(), changes });
+      }
+    }
+    this._editOriginalSnapshot = null;
+
     this.stopScanning();
     this.hideModal('modal-edit');
     this.editingCard = null;
@@ -694,7 +746,8 @@ const App = {
 
   async renderDetail(card) {
     document.getElementById('detail-title').textContent = card.storeName;
-    renderCode(document.getElementById('detail-code-mini'), card.code, card.codeType, { height: 150, width: 400, responsive: true });
+    const codeOpts = card.codeType === 'QR' ? { width: 400, height: 400, responsive: true } : { height: 150, width: 400, responsive: true };
+    renderCode(document.getElementById('detail-code-mini'), card.code, card.codeType, codeOpts);
     document.getElementById('detail-history-section').hidden = true;
     document.getElementById('detail-uses').textContent = card.useCount || 0;
     document.getElementById('detail-last-used').textContent = this.formatLastUsed(card.lastUsedAt);
@@ -712,8 +765,20 @@ const App = {
       history.slice(0, 30).forEach((h) => {
         const row = document.createElement('div');
         row.className = 'history-row';
-        const label = h.type === 'code' ? i18n.t('history_code_shown') : i18n.t('history_detail_open');
-        row.innerHTML = `<span>${this.formatLastUsed(h.timestamp)}</span><span class="type">${label}${h.durationMs ? ' · ' + Math.round(h.durationMs / 1000) + 's' : ''}</span>`;
+        let label = i18n.t('history_detail_open');
+        if (h.type === 'code') label = i18n.t('history_code_shown');
+        else if (h.type === 'created') label = i18n.t('history_created');
+        else if (h.type === 'edited') label = i18n.t('history_edited');
+        const top = document.createElement('div');
+        top.className = 'history-row-top';
+        top.innerHTML = `<span>${this.formatLastUsed(h.timestamp)}</span><span class="type">${label}${h.durationMs ? ' · ' + Math.round(h.durationMs / 1000) + 's' : ''}</span>`;
+        row.appendChild(top);
+        if (h.type === 'edited' && h.changes) {
+          const changesEl = document.createElement('div');
+          changesEl.className = 'history-changes';
+          changesEl.textContent = h.changes;
+          row.appendChild(changesEl);
+        }
         listEl.appendChild(row);
       });
     }
@@ -742,7 +807,8 @@ const App = {
     document.getElementById('fs-store-name').textContent = card.storeName;
     this.fsZoom = 100; this.fsRotated = false;
     document.getElementById('fs-zoom').value = 100;
-    renderCode(document.getElementById('fs-code-container'), card.code, card.codeType, { height: 180, width: 500, responsive: true });
+    const fsOpts = card.codeType === 'QR' ? { width: 500, height: 500, responsive: true } : { height: 180, width: 500, responsive: true };
+    renderCode(document.getElementById('fs-code-container'), card.code, card.codeType, fsOpts);
     this.applyFsTransform();
     document.getElementById('modal-fullscreen-code').hidden = false;
 
