@@ -1,5 +1,11 @@
 // Vernostka service worker - offline-first app shell cache
-const CACHE_VERSION = 'vernostka-v2';
+//
+// IMPORTANT: bump CACHE_VERSION whenever app files change. Each bump makes the browser
+// treat this as a new service worker, which re-runs install() (refreshing every cached
+// file) and activate() (deleting old cache versions). Forgetting to bump it can leave the
+// app running on a stale mix of old/new files after a deploy.
+const CACHE_VERSION = 'vernostka-v3';
+
 const APP_SHELL = [
   './',
   './index.html',
@@ -24,6 +30,15 @@ const APP_SHELL = [
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
 ];
 
+// Same-origin app code (HTML/JS/CSS) that should always be fetched fresh from the network
+// first when online, so a deploy is visible immediately instead of waiting on a background
+// revalidation. Everything else (icons, manifest, pinned third-party libs) is effectively
+// immutable/versioned, so cache-first is safe and faster for those.
+function isAppCode(url) {
+  if (url.origin !== self.location.origin) return false;
+  return url.pathname.endsWith('.html') || url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.endsWith('/');
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_VERSION).then((cache) =>
@@ -47,19 +62,40 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Strategy: cache-first for app shell & libs, network-first (falling back to cache) for everything else.
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
+  const url = new URL(req.url);
 
+  if (isAppCode(url)) {
+    // Network-first: always get the latest app code when online. Offline (or if the
+    // network request fails), fall back to the cache so the app still works.
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res && res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE_VERSION).then((cache) => cache.put(req, clone));
+          }
+          return res;
+        })
+        .catch(() =>
+          caches.match(req).then((cached) => {
+            if (cached) return cached;
+            if (req.mode === 'navigate') return caches.match('./index.html');
+            return new Response('', { status: 408, statusText: 'Offline' });
+          })
+        )
+    );
+    return;
+  }
+
+  // Icons, manifest, third-party libs: cache-first, refreshing the cache in the background.
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) {
-        // Refresh cache in background if online (stale-while-revalidate)
         fetch(req).then((res) => {
-          if (res && res.ok) {
-            caches.open(CACHE_VERSION).then((cache) => cache.put(req, res.clone()));
-          }
+          if (res && res.ok) caches.open(CACHE_VERSION).then((cache) => cache.put(req, res.clone()));
         }).catch(() => {});
         return cached;
       }
@@ -71,13 +107,7 @@ self.addEventListener('fetch', (event) => {
           }
           return res;
         })
-        .catch(() => {
-          // Offline and not cached: for navigations, fall back to app shell
-          if (req.mode === 'navigate') {
-            return caches.match('./index.html');
-          }
-          return new Response('', { status: 408, statusText: 'Offline' });
-        });
+        .catch(() => new Response('', { status: 408, statusText: 'Offline' }));
     })
   );
 });
