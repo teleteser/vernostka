@@ -407,6 +407,7 @@ const App = {
     this._editOriginalSnapshot = null;
     document.getElementById('edit-title').textContent = i18n.t('add_card');
     this.showModal('modal-edit');
+    void document.getElementById('modal-edit').offsetHeight;
     this.fillEditForm();
     this.populateCodeTypeSelect();
     document.getElementById('field-code-type').value = this.editingCard.codeType;
@@ -421,6 +422,7 @@ const App = {
     this.autosaveEnabled = !!card.isDraft;
     document.getElementById('edit-title').textContent = card.isDraft ? i18n.t('add_card') : i18n.t('edit');
     this.showModal('modal-edit');
+    void document.getElementById('modal-edit').offsetHeight;
     this.fillEditForm();
     this.populateCodeTypeSelect();
     document.getElementById('field-code-type').value = this.editingCard.codeType;
@@ -683,9 +685,9 @@ const App = {
     await this.renderCardsList();
     this.onDataChanged();
 
-    if (missingName && missingCode) this.toast(i18n.t('saved_missing_both'));
-    else if (missingCode) this.toast(i18n.t('saved_missing_code'));
-    else if (missingName) this.toast(i18n.t('saved_missing_name'));
+    if (missingName && missingCode) this.showBanner(i18n.t('saved_title'), i18n.t('saved_missing_both'), []);
+    else if (missingCode) this.showBanner(i18n.t('saved_title'), i18n.t('saved_missing_code'), []);
+    else if (missingName) this.showBanner(i18n.t('saved_title'), i18n.t('saved_missing_name'), []);
   },
 
   // ---------------- Location / map picker ----------------
@@ -731,7 +733,7 @@ const App = {
       this.openEditCard(this._detailCard);
     });
     document.getElementById('show-code-btn').addEventListener('click', () => {
-      if (!this._detailCard.code) { this.openEditCard(this._detailCard); return; }
+      if (!this._detailCard.code) { this.hideModal('modal-detail'); this.openEditCard(this._detailCard); return; }
       this.openFullscreenCode(this._detailCard);
     });
     document.getElementById('toggle-history-btn').addEventListener('click', () => {
@@ -748,8 +750,11 @@ const App = {
     await DB.addHistory({ id: DB.uid(), cardId: card.id, type: 'detail', timestamp: Date.now() });
     // Show the modal BEFORE rendering the code: while hidden (display:none) the container
     // has no layout, so measuring its width for the responsive barcode/QR sizing would be
-    // unreliable and produce an incorrectly-scaled (not full-width) result.
+    // unreliable and produce an incorrectly-scaled (not full-width) result. Forcing a
+    // synchronous reflow (reading offsetHeight) guarantees the browser has actually laid
+    // out the now-visible modal before we measure anything inside it.
     this.showModal('modal-detail');
+    void document.getElementById('modal-detail').offsetHeight;
     this.renderDetail(card);
     this.onDataChanged();
   },
@@ -825,6 +830,7 @@ const App = {
     this.fsZoom = 100; this.fsRotated = false;
     document.getElementById('fs-zoom').value = 100;
     document.getElementById('modal-fullscreen-code').hidden = false;
+    void document.getElementById('modal-fullscreen-code').offsetHeight;
     const fsOpts = card.codeType === 'QR' ? { width: 500, height: 500, responsive: true } : { height: 180, width: 500, responsive: true };
     renderCode(document.getElementById('fs-code-container'), card.code, card.codeType, fsOpts);
     this.applyFsTransform();

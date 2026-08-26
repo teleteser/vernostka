@@ -132,6 +132,7 @@ const I18N = {
     saved_missing_name: 'Karta bola pridana, no nebol vyplneny nazov.',
     saved_missing_both: 'Karta bola pridana, no chyba nazov aj kod.',
     code_missing_hint: 'Kod nie je vyplneny. Klepnutim upravis kartu.',
+    saved_title: 'Ulozene',
   },
   en: {
     appName: 'LoyalCards',
@@ -265,6 +266,7 @@ const I18N = {
     saved_missing_name: 'Card was added, but no name was entered.',
     saved_missing_both: 'Card was added, but name and code are both missing.',
     code_missing_hint: 'No code entered yet. Tap to edit this card.',
+    saved_title: 'Saved',
   }
 };
 

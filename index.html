@@ -160,7 +160,7 @@
       <div id="manual-pane" class="capture-pane" hidden>
         <div class="code-preview" id="manual-code-preview"></div>
         <label class="field-label" data-i18n="card_code_label">Cislo / kod karty</label>
-        <input type="text" id="field-code" autocomplete="off" data-i18n-placeholder="card_code_placeholder" placeholder="Naskenuj alebo zadaj cislo">
+        <input type="text" id="field-code" name="loyalty-code-manual" autocomplete="new-password" autocorrect="off" spellcheck="false" data-i18n-placeholder="card_code_placeholder" placeholder="Naskenuj alebo zadaj cislo">
         <label class="field-label" data-i18n="code_type_label">Typ kodu</label>
         <select id="field-code-type"></select>
       </div>
@@ -188,11 +188,6 @@
           </div>
         </div>
 
-        <div id="edit-danger-actions" class="btn-row" hidden>
-          <button id="edit-delete-card-btn" class="btn btn-danger-ghost small" data-i18n="delete_card_title">Zmazat kartu</button>
-          <button id="edit-clear-history-btn" class="btn btn-danger-ghost small" data-i18n="delete_history_title">Vymazat historiu</button>
-        </div>
-
         <label class="field-label" data-i18n="category_label">Kategoria</label>
         <select id="field-category"></select>
 
@@ -203,6 +198,11 @@
         <p class="hint" data-i18n="location_permission_note">GPS poloha je nepovinna.</p>
         <div id="location-list" class="location-list"></div>
         <button id="add-location-btn" class="btn btn-ghost" data-i18n="add_location">+ Pridat pobocku</button>
+
+        <div id="edit-danger-actions" class="btn-row" hidden>
+          <button id="edit-delete-card-btn" class="btn btn-danger-ghost small" data-i18n="delete_card_title">Zmazat kartu</button>
+          <button id="edit-clear-history-btn" class="btn btn-danger-ghost small" data-i18n="delete_history_title">Vymazat historiu</button>
+        </div>
       </div>
     </div>
   </div>
