@@ -28,17 +28,23 @@
   --primary-light: #3a6491;
 }
 
-
 [hidden] { display: none !important; }
+
 * { box-sizing: border-box; }
-html, body { height: 100%; }
+html, body { height: 100%; overscroll-behavior-y: none; }
 body {
   margin: 0;
   font-family: var(--font);
   background: var(--bg);
   color: var(--text);
   -webkit-tap-highlight-color: transparent;
-  overscroll-behavior-y: contain;
+  overscroll-behavior-y: none;
+}
+/* Prevent the browser's native pull-to-refresh from firing when swiping down inside any
+   scrollable area of the app (list, modals) - without this, a downward swipe can reload
+   the whole page and reset whatever step/screen the user was on. */
+.view, .modal-body, .modal-full, #cards-list {
+  overscroll-behavior-y: none;
 }
 button, input, select, textarea { font-family: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -213,7 +219,10 @@ p { margin: 0.35em 0; }
 .settings-group h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 10px; }
 .settings-category-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
 .settings-category-row { display: flex; align-items: center; justify-content: space-between; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
-.settings-category-row button { background: none; border: none; color: var(--danger); font-size: 13px; font-weight: 600; }
+.settings-category-row .cat-row-actions { display: flex; gap: 14px; align-items: center; }
+.settings-category-row button { background: none; border: none; font-size: 13px; font-weight: 600; padding: 4px; }
+.settings-category-row .cat-rename-btn { color: var(--primary-light); font-size: 16px; }
+.settings-category-row .cat-delete-btn { color: var(--danger); }
 
 .segmented {
   display: flex;
@@ -278,10 +287,23 @@ p { margin: 0.35em 0; }
   pointer-events: none;
 }
 .camera-denied { text-align: center; padding: 18px 10px; }
+.scan-slow-hint { text-align: center; margin-top: 10px; }
+.scan-slow-hint button { margin-top: 6px; }
 
 .code-preview { display: flex; align-items: center; justify-content: center; min-height: 140px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 14px; }
 .code-preview svg, .code-preview img { max-width: 100%; }
+.code-preview .qr-holder { width: 100%; display: flex; align-items: center; justify-content: center; }
+.code-preview.code-square { aspect-ratio: 1 / 1; }
+.code-preview.code-square .qr-holder,
+.code-preview.code-square .qr-holder canvas,
+.code-preview.code-square .qr-holder img,
+.code-preview.code-square .qr-holder table { width: 100%; height: 100%; }
 .code-render-error { font-size: 13px; color: var(--text-muted); word-break: break-all; }
+
+/* Large, near-edge-to-edge code display used in the card detail screen: bleeds past the
+   modal's normal side padding so the code visually spans ~95% of the screen width. */
+.detail-code-frame { margin: 0 -20px 16px; padding: 0 10px; background: none; border: none; }
+.detail-code-frame .code-preview { margin: 0; }
 
 .field-label { display: block; font-size: 12.5px; font-weight: 700; color: var(--text-muted); margin: 16px 0 6px; text-transform: uppercase; letter-spacing: 0.03em; }
 input[type="text"], input[type="search"], select, textarea {
@@ -312,11 +334,13 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 .code-card-btn { width: 100%; border: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .tap-hint { font-size: 12.5px; color: var(--text-muted); font-weight: 600; }
 
-.detail-stats { display: flex; gap: 10px; margin: 16px 0; }
-.detail-stats > div { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; text-align: center; }
-.detail-stats strong { display: block; font-size: 20px; color: var(--primary); }
-[data-theme="dark"] .detail-stats strong { color: #EAF0F6; }
-.detail-stats span { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; }
+.detail-actions-row { display: flex; gap: 10px; margin: 0 0 16px; }
+.stat-pill { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 8px; text-align: center; }
+.stat-pill strong { display: block; font-size: 18px; color: var(--primary); }
+[data-theme="dark"] .stat-pill strong { color: #EAF0F6; }
+.stat-pill span { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
+.stat-pill.pill-button { border: none; font-weight: 700; font-size: 13.5px; color: var(--accent); background: var(--surface); display: flex; align-items: center; justify-content: center; }
+.stat-pill.pill-button:active { opacity: 0.7; }
 
 .detail-section { margin-top: 20px; }
 .detail-section h3 { font-size: 13px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; letter-spacing: 0.03em; }
@@ -329,12 +353,18 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   background: #fff;
   z-index: 100;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 20px;
+  padding: 20px 10px;
 }
 .fs-close-btn { position: absolute; top: calc(16px + var(--safe-top)); left: 16px; background: none; border: none; }
 .fs-store-name { color: #111; font-weight: 800; font-size: 18px; margin-bottom: 14px; }
-.fs-code-container { display: flex; align-items: center; justify-content: center; transition: transform 0.15s; }
-.fs-code-container svg, .fs-code-container img { max-width: 90vw; }
+.fs-code-container { width: 100%; display: flex; align-items: center; justify-content: center; transition: transform 0.15s; }
+.fs-code-container.code-square { aspect-ratio: 1 / 1; }
+.fs-code-container.code-square .qr-holder,
+.fs-code-container.code-square .qr-holder canvas,
+.fs-code-container.code-square .qr-holder img,
+.fs-code-container.code-square .qr-holder table { width: 100%; height: 100%; }
+.fs-code-container svg { width: 100%; height: auto; }
+.fs-code-container .qr-holder { width: 100%; display: flex; align-items: center; justify-content: center; }
 .fs-controls { position: absolute; bottom: calc(24px + var(--safe-bottom)); display: flex; align-items: center; gap: 14px; width: 80%; }
 .fs-controls input[type=range] { flex: 1; }
 

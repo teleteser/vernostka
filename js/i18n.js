@@ -109,6 +109,13 @@ const I18N = {
     unsaved_changes_leave: 'Mas neulozene zmeny. Naozaj chces odist?',
     error_generic: 'Nieco sa pokazilo. Skus to prosim znova.',
     barcode_detector_unavailable: 'Tento prehliadac nepodporuje automatické skenovanie ciarovych kodov. Skus QR kod alebo zadaj cislo rucne.',
+    scan_slow_hint: 'Nedari sa naskenovat? Skus kod napisat rucne, appka ho vygeneruje.',
+    rename: 'Premenovat',
+    category_rename_prompt: 'Novy nazov kategorie',
+    category_delete_choice_title: 'Zmazat kategoriu?',
+    category_delete_choice_desc: 'Kategoria "{name}" obsahuje karty. Co chces s nimi urobit?',
+    category_delete_move: 'Presunut do Ine',
+    category_delete_remove_cards: 'Zmazat karty',
   },
   en: {
     appName: 'LoyalCards',
@@ -219,6 +226,13 @@ const I18N = {
     unsaved_changes_leave: 'You have unsaved changes. Really leave?',
     error_generic: 'Something went wrong. Please try again.',
     barcode_detector_unavailable: 'This browser doesn\'t support automatic barcode scanning. Try a QR code or enter the number manually.',
+    scan_slow_hint: 'Having trouble scanning? Type the code manually and the app will generate it.',
+    rename: 'Rename',
+    category_rename_prompt: 'New category name',
+    category_delete_choice_title: 'Delete category?',
+    category_delete_choice_desc: 'The category "{name}" contains cards. What should happen to them?',
+    category_delete_move: 'Move to Other',
+    category_delete_remove_cards: 'Delete cards',
   }
 };
 

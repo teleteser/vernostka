@@ -1,5 +1,5 @@
 // Vernostka service worker - offline-first app shell cache
-const CACHE_VERSION = 'vernostka-v1';
+const CACHE_VERSION = 'vernostka-v2';
 const APP_SHELL = [
   './',
   './index.html',
@@ -18,7 +18,7 @@ const APP_SHELL = [
   // Third-party libs, cached on first successful fetch too, but pre-list core ones
   'https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js',
+  'https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
 ];

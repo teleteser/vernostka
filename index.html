@@ -151,6 +151,10 @@
           <p class="hint" data-i18n="camera_denied_desc">Povol pristup ku kamere v nastaveniach.</p>
           <button id="camera-denied-manual-btn" class="btn btn-secondary" data-i18n="use_manual_instead">Zadat kod rucne</button>
         </div>
+        <div id="scan-slow-hint" class="scan-slow-hint" hidden>
+          <p class="hint" data-i18n="scan_slow_hint">Nedari sa naskenovat?</p>
+          <button id="scan-slow-manual-btn" class="btn btn-ghost small" data-i18n="use_manual_instead">Zadat kod rucne</button>
+        </div>
       </div>
 
       <div id="manual-pane" class="capture-pane" hidden>
@@ -166,6 +170,11 @@
         <div class="store-name-row">
           <div id="store-logo-preview" class="store-logo-preview"></div>
           <input type="text" id="field-store-name" data-i18n-placeholder="store_name_placeholder" placeholder="napr. Lidl">
+        </div>
+
+        <div id="edit-danger-actions" class="btn-row" hidden>
+          <button id="edit-delete-card-btn" class="btn btn-danger-ghost small" data-i18n="delete_card_title">Zmazat kartu</button>
+          <button id="edit-clear-history-btn" class="btn btn-danger-ghost small" data-i18n="delete_history_title">Vymazat historiu</button>
         </div>
 
         <label class="field-label" data-i18n="category_label">Kategoria</label>
@@ -211,28 +220,24 @@
       </button>
     </header>
     <div class="modal-body">
-      <button id="show-code-btn" class="code-card-btn">
+      <button id="show-code-btn" class="code-card-btn detail-code-frame">
         <div id="detail-code-mini" class="code-preview"></div>
-        <span class="tap-hint">Tap to show</span>
       </button>
 
-      <div class="detail-stats">
-        <div><strong id="detail-uses">0</strong><span data-i18n="uses_label">pouzitia</span></div>
-        <div><span data-i18n="last_used">Naposledy</span><strong id="detail-last-used">-</strong></div>
+      <div class="detail-actions-row">
+        <div class="stat-pill"><strong id="detail-uses">0</strong><span data-i18n="uses_label">pouzitia</span></div>
+        <div class="stat-pill"><span data-i18n="last_used">Naposledy</span><strong id="detail-last-used">-</strong></div>
+        <button id="toggle-history-btn" class="stat-pill pill-button" data-i18n="history_title">Historia</button>
+      </div>
+
+      <div id="detail-history-section" hidden>
+        <div id="detail-history-list" class="history-list"></div>
       </div>
 
       <div class="detail-section">
         <h3 id="detail-note-title" data-i18n="note_label" hidden>Poznamka</h3>
         <p id="detail-note"></p>
       </div>
-
-      <div class="detail-section">
-        <h3 data-i18n="history_title">Historia pouzitia</h3>
-        <div id="detail-history-list" class="history-list"></div>
-        <button id="clear-history-btn" class="btn btn-danger-ghost small" data-i18n="delete_history_title">Vymazat historiu</button>
-      </div>
-
-      <button id="delete-card-btn" class="btn btn-danger-ghost" data-i18n="delete_card_title">Zmazat kartu</button>
     </div>
   </div>
 
@@ -268,7 +273,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
+<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script src="js/i18n.js"></script>

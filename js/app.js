@@ -30,6 +30,10 @@ const App = {
     this.bindFullscreenCode();
     this.bindConfirmModal();
 
+    // Keep a pristine copy of the confirm sheet's button row so threeWayDialog() can
+    // rebuild it after temporarily replacing it with a custom set of buttons.
+    this._confirmBtnRowTemplate = document.querySelector('#modal-confirm .btn-row').innerHTML;
+
     this.renderCategoryChips();
     this.renderCategorySelect();
     this.renderSettingsCategories();
@@ -82,7 +86,11 @@ const App = {
   },
 
   categoryLabel(cat) {
-    return cat.builtin ? i18n.t(cat.builtin) : cat.name;
+    // A custom name (set via rename, even on a built-in category) always wins; otherwise
+    // built-in categories fall back to the live-translated label so they still relabel
+    // themselves automatically when the app language is switched.
+    if (cat.name && cat.name.trim()) return cat.name.trim();
+    return cat.builtin ? i18n.t(cat.builtin) : '';
   },
 
   registerServiceWorker() {
@@ -232,8 +240,39 @@ const App = {
 
     document.getElementById('add-location-btn').addEventListener('click', () => this.openLocationPicker(null));
     document.getElementById('camera-denied-manual-btn').addEventListener('click', () => this.switchCapturePane('manual'));
+    document.getElementById('scan-slow-manual-btn').addEventListener('click', () => this.switchCapturePane('manual'));
     document.getElementById('switch-camera-btn').addEventListener('click', () => {
       if (this.scanner) this.scanner.switchCamera((r) => this.handleScanResult(r), (e) => this.handleCameraError(e));
+    });
+
+    document.getElementById('edit-delete-card-btn').addEventListener('click', async () => {
+      const ok = await this.confirmDialog(
+        i18n.t('delete_card_title'),
+        i18n.t('delete_card_desc', { name: this.editingCard.storeName }),
+        i18n.t('delete'), i18n.t('cancel')
+      );
+      if (!ok) return;
+      await DB.deleteCard(this.editingCard.id);
+      this.stopScanning();
+      this.hideModal('modal-edit');
+      this.hideModal('modal-detail');
+      this.editingCard = null;
+      await this.renderCardsList();
+      this.onDataChanged();
+    });
+    document.getElementById('edit-clear-history-btn').addEventListener('click', async () => {
+      const ok = await this.confirmDialog(i18n.t('delete_history_title'), i18n.t('delete_history_desc'), i18n.t('confirm'), i18n.t('cancel'));
+      if (!ok) return;
+      await DB.clearHistoryForCard(this.editingCard.id);
+      this.editingCard.useCount = 0;
+      this.editingCard.detailOpenCount = 0;
+      this.editingCard.lastUsedAt = null;
+      await DB.putCard(this.editingCard);
+      if (this._detailCard && this._detailCard.id === this.editingCard.id) {
+        Object.assign(this._detailCard, { useCount: 0, detailOpenCount: 0, lastUsedAt: null });
+      }
+      this.toast(i18n.t('delete_history_title'));
+      this.onDataChanged();
     });
   },
 
@@ -321,6 +360,7 @@ const App = {
     this.renderManualCodePreview();
     this.renderLocationList();
     document.getElementById('camera-denied').hidden = true;
+    document.getElementById('edit-danger-actions').hidden = this.editingIsNew;
   },
 
   renderLogoPreview() {
@@ -368,15 +408,21 @@ const App = {
     this.stopScanning();
     const video = document.getElementById('scan-video');
     document.getElementById('camera-denied').hidden = true;
+    document.getElementById('scan-slow-hint').hidden = true;
     this.scanner = new Scanner(video);
-    if (!Scanner.supportsNativeDetector) {
-      // still fine, jsQR fallback handles QR only
-    }
     const ok = await this.scanner.start((result) => this.handleScanResult(result), (err) => this.handleCameraError(err));
-    if (!ok) this.handleCameraError();
+    if (!ok) { this.handleCameraError(); return; }
+    // If nothing gets detected for a while, nudge the user toward manual entry instead of
+    // leaving them staring at a camera feed indefinitely (helps with damaged/unusual codes).
+    clearTimeout(this._scanSlowTimer);
+    this._scanSlowTimer = setTimeout(() => {
+      const hint = document.getElementById('scan-slow-hint');
+      if (hint && !document.getElementById('scan-pane').hidden) hint.hidden = false;
+    }, 9000);
   },
 
   stopScanning() {
+    clearTimeout(this._scanSlowTimer);
     if (this.scanner) { this.scanner.stop(); }
   },
 
@@ -483,28 +529,9 @@ const App = {
       this.openEditCard(this._detailCard);
     });
     document.getElementById('show-code-btn').addEventListener('click', () => this.openFullscreenCode(this._detailCard));
-    document.getElementById('clear-history-btn').addEventListener('click', async () => {
-      const ok = await this.confirmDialog(i18n.t('delete_history_title'), i18n.t('delete_history_desc'), i18n.t('confirm'), i18n.t('cancel'));
-      if (!ok) return;
-      await DB.clearHistoryForCard(this._detailCard.id);
-      this._detailCard.useCount = 0;
-      this._detailCard.detailOpenCount = 0;
-      this._detailCard.lastUsedAt = null;
-      await DB.putCard(this._detailCard);
-      this.renderDetail(this._detailCard);
-      this.onDataChanged();
-    });
-    document.getElementById('delete-card-btn').addEventListener('click', async () => {
-      const ok = await this.confirmDialog(
-        i18n.t('delete_card_title'),
-        i18n.t('delete_card_desc', { name: this._detailCard.storeName }),
-        i18n.t('delete'), i18n.t('cancel')
-      );
-      if (!ok) return;
-      await DB.deleteCard(this._detailCard.id);
-      this.hideModal('modal-detail');
-      await this.renderCardsList();
-      this.onDataChanged();
+    document.getElementById('toggle-history-btn').addEventListener('click', () => {
+      const el = document.getElementById('detail-history-section');
+      el.hidden = !el.hidden;
     });
   },
 
@@ -521,7 +548,8 @@ const App = {
 
   async renderDetail(card) {
     document.getElementById('detail-title').textContent = card.storeName;
-    renderCode(document.getElementById('detail-code-mini'), card.code, card.codeType, { height: 70, width: 200 });
+    renderCode(document.getElementById('detail-code-mini'), card.code, card.codeType, { height: 150, width: 400, responsive: true });
+    document.getElementById('detail-history-section').hidden = true;
     document.getElementById('detail-uses').textContent = card.useCount || 0;
     document.getElementById('detail-last-used').textContent = this.formatLastUsed(card.lastUsedAt);
     const noteTitle = document.getElementById('detail-note-title');
@@ -568,7 +596,7 @@ const App = {
     document.getElementById('fs-store-name').textContent = card.storeName;
     this.fsZoom = 100; this.fsRotated = false;
     document.getElementById('fs-zoom').value = 100;
-    renderCode(document.getElementById('fs-code-container'), card.code, card.codeType, { height: 160, width: 300 });
+    renderCode(document.getElementById('fs-code-container'), card.code, card.codeType, { height: 180, width: 500, responsive: true });
     this.applyFsTransform();
     document.getElementById('modal-fullscreen-code').hidden = false;
 
@@ -678,16 +706,46 @@ const App = {
       const row = document.createElement('div');
       row.className = 'settings-category-row';
       const canDelete = !cat.builtin;
-      row.innerHTML = `<span>${this.escapeHtml(this.categoryLabel(cat))}</span>${canDelete ? `<button>${i18n.t('delete')}</button>` : ''}`;
+      const label = this.escapeHtml(this.categoryLabel(cat));
+      row.innerHTML = `<span>${label}</span><div class="cat-row-actions"><button class="cat-rename-btn" aria-label="${i18n.t('rename')}">&#9998;</button>${canDelete ? `<button class="cat-delete-btn">${i18n.t('delete')}</button>` : ''}</div>`;
+
+      row.querySelector('.cat-rename-btn').addEventListener('click', async () => {
+        const current = this.categoryLabel(cat);
+        const name = prompt(i18n.t('category_rename_prompt'), current);
+        if (!name || !name.trim() || name.trim() === current) return;
+        cat.name = name.trim();
+        await DB.putCategory(cat);
+        this.categories = await DB.getAllCategories();
+        this.renderSettingsCategories();
+        this.renderCategoryChips();
+        this.renderCategorySelect();
+        await this.renderCardsList();
+        this.onDataChanged();
+      });
+
       if (canDelete) {
-        row.querySelector('button').addEventListener('click', async () => {
-          const otherId = this.categories.find((c) => c.builtin === 'category_other');
+        row.querySelector('.cat-delete-btn').addEventListener('click', async () => {
+          const label2 = this.categoryLabel(cat);
+          const otherCat = this.categories.find((c) => c.builtin === 'category_other' && c.id !== cat.id);
+          const choice = await this.threeWayDialog(
+            i18n.t('category_delete_choice_title'),
+            i18n.t('category_delete_choice_desc', { name: label2 }),
+            [
+              { label: i18n.t('cancel'), value: 'cancel', className: 'btn-ghost' },
+              { label: i18n.t('category_delete_move'), value: 'move', className: 'btn-secondary' },
+              { label: i18n.t('category_delete_remove_cards'), value: 'delete', className: 'btn-danger' }
+            ]
+          );
+          if (!choice || choice === 'cancel') return;
           const allCards = await DB.getAllCards();
-          for (const c of allCards) {
-            if (c.categoryId === cat.id) {
-              c.categoryId = otherId ? otherId.id : c.categoryId;
+          const affected = allCards.filter((c) => c.categoryId === cat.id);
+          if (choice === 'move') {
+            for (const c of affected) {
+              c.categoryId = otherCat ? otherCat.id : c.categoryId;
               await DB.putCard(c);
             }
+          } else if (choice === 'delete') {
+            for (const c of affected) await DB.deleteCard(c.id);
           }
           await DB.deleteCategory(cat.id);
           this.categories = await DB.getAllCategories();
@@ -836,6 +894,30 @@ const App = {
       };
       document.getElementById('confirm-ok-btn').addEventListener('click', () => { cleanup(); resolve('merge'); }, { once: true });
       document.getElementById('confirm-cancel-btn').addEventListener('click', () => { cleanup(); resolve('replace'); }, { once: true });
+      this.showModal('modal-confirm');
+    });
+  },
+
+  // Generic 2-or-3-button sheet. buttons: [{label, value, className}]. Resolves with the
+  // clicked button's value. Rebuilds the confirm sheet's default two buttons afterwards so
+  // confirmDialog()/choiceDialog() keep working normally on subsequent calls.
+  threeWayDialog(title, desc, buttons) {
+    return new Promise((resolve) => {
+      document.getElementById('confirm-title').textContent = title;
+      document.getElementById('confirm-desc').textContent = desc;
+      const btnRow = document.querySelector('#modal-confirm .btn-row');
+      btnRow.innerHTML = '';
+      buttons.forEach((b) => {
+        const btn = document.createElement('button');
+        btn.className = 'btn ' + (b.className || 'btn-ghost');
+        btn.textContent = b.label;
+        btn.addEventListener('click', () => {
+          this.hideModal('modal-confirm');
+          btnRow.innerHTML = this._confirmBtnRowTemplate;
+          resolve(b.value);
+        });
+        btnRow.appendChild(btn);
+      });
       this.showModal('modal-confirm');
     });
   },

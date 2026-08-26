@@ -15,23 +15,43 @@ function guessCodeType(value) {
   return 'CODE128';
 }
 
+// Makes a rendered barcode <svg> scale fluidly to its container's width while preserving
+// aspect ratio, by converting its fixed pixel size into a viewBox.
+function makeSvgResponsive(svg) {
+  const w = svg.width && svg.width.baseVal ? svg.width.baseVal.value : null;
+  const h = svg.height && svg.height.baseVal ? svg.height.baseVal.value : null;
+  if (w && h) {
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    svg.removeAttribute('width');
+    svg.removeAttribute('height');
+  }
+  svg.style.width = '100%';
+  svg.style.height = 'auto';
+  svg.style.display = 'block';
+}
+
 // Renders a code into the given container element, clearing it first.
 // type: one of CODE_TYPES. value: the raw code string.
+// options.responsive: if true, the code fluidly fills the container's width (and, for QR,
+// the container becomes a perfect square via CSS aspect-ratio - see .code-square in style.css).
 function renderCode(container, value, type, options = {}) {
   container.innerHTML = '';
+  container.classList.remove('code-square');
   if (!value) return;
   const t = type || guessCodeType(value);
   try {
     if (t === 'QR') {
-      const div = document.createElement('div');
-      container.appendChild(div);
+      const holder = document.createElement('div');
+      holder.className = 'qr-holder';
+      container.appendChild(holder);
       // eslint-disable-next-line no-undef
-      new QRCode(div, {
+      new QRCode(holder, {
         text: value,
-        width: options.width || 260,
-        height: options.height || 260,
+        width: options.width || 300,
+        height: options.height || 300,
         correctLevel: QRCode.CorrectLevel.M
       });
+      if (options.responsive) container.classList.add('code-square');
     } else {
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       container.appendChild(svg);
@@ -49,9 +69,11 @@ function renderCode(container, value, type, options = {}) {
         margin: 8,
         background: 'transparent'
       });
+      if (options.responsive) makeSvgResponsive(svg);
     }
   } catch (err) {
-    // Fallback: if format-specific rendering fails (e.g. invalid EAN checksum), use CODE128
+    // Fallback: if format-specific rendering fails (e.g. invalid EAN checksum), use CODE128,
+    // which accepts arbitrary ASCII and therefore always succeeds for scanned/typed values.
     console.warn('renderCode fallback to CODE128', err);
     try {
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -59,6 +81,7 @@ function renderCode(container, value, type, options = {}) {
       container.appendChild(svg);
       // eslint-disable-next-line no-undef
       JsBarcode(svg, value, { format: 'CODE128', height: options.height || 120, margin: 8, background: 'transparent' });
+      if (options.responsive) makeSvgResponsive(svg);
     } catch (err2) {
       container.innerHTML = `<div class="code-render-error">${value}</div>`;
     }
