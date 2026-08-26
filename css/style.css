@@ -39,6 +39,25 @@ body {
   color: var(--text);
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
+  /* This is an app-like UI, not a document - a quick/long tap on any text (card names,
+     "not used yet" labels, buttons...) should never trigger the browser's native text
+     selection. That native selection popup (with "Copy" / "Share" / a Google web-search
+     icon) is what looked like a stray system window appearing after tapping a card. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+/* Exceptions: content people may actually want to copy (a note with a PIN, the code's
+   text value, a change-history entry) should stay selectable. */
+#detail-note, .history-changes, .code-render-error {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
 }
 /* Prevent the browser's native pull-to-refresh from firing when swiping down inside any
    scrollable area of the app (list, modals) - without this, a downward swipe can reload
