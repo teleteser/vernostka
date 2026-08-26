@@ -406,10 +406,10 @@ const App = {
     this.autosaveEnabled = true;
     this._editOriginalSnapshot = null;
     document.getElementById('edit-title').textContent = i18n.t('add_card');
+    this.showModal('modal-edit');
     this.fillEditForm();
     this.populateCodeTypeSelect();
     document.getElementById('field-code-type').value = this.editingCard.codeType;
-    this.showModal('modal-edit');
     this.switchCapturePane('scan');
   },
 
@@ -420,10 +420,10 @@ const App = {
     this._editOriginalSnapshot = card.isDraft ? null : JSON.parse(JSON.stringify(card));
     this.autosaveEnabled = !!card.isDraft;
     document.getElementById('edit-title').textContent = card.isDraft ? i18n.t('add_card') : i18n.t('edit');
+    this.showModal('modal-edit');
     this.fillEditForm();
     this.populateCodeTypeSelect();
     document.getElementById('field-code-type').value = this.editingCard.codeType;
-    this.showModal('modal-edit');
     this.switchCapturePane('manual');
   },
 
@@ -641,11 +641,11 @@ const App = {
 
   async saveEditingCard() {
     const c = this.editingCard;
-    if (!c.storeName || !c.storeName.trim() || !c.code || !c.code.trim()) {
-      this.toast(i18n.t('required_fields'));
-      return;
-    }
-    if (this.editingIsNew) {
+    const missingName = !c.storeName || !c.storeName.trim();
+    const missingCode = !c.code || !c.code.trim();
+    if (missingName) c.storeName = i18n.t('untitled_card');
+
+    if (this.editingIsNew && !missingCode) {
       const dup = await DB.findByCode(c.code);
       // Ignore a "duplicate" that is actually our own in-progress draft record (autosave
       // already persisted it under this same id/code) or any other leftover draft - only
@@ -682,6 +682,10 @@ const App = {
     this.editingCard = null;
     await this.renderCardsList();
     this.onDataChanged();
+
+    if (missingName && missingCode) this.toast(i18n.t('saved_missing_both'));
+    else if (missingCode) this.toast(i18n.t('saved_missing_code'));
+    else if (missingName) this.toast(i18n.t('saved_missing_name'));
   },
 
   // ---------------- Location / map picker ----------------
@@ -726,7 +730,10 @@ const App = {
       this.hideModal('modal-detail');
       this.openEditCard(this._detailCard);
     });
-    document.getElementById('show-code-btn').addEventListener('click', () => this.openFullscreenCode(this._detailCard));
+    document.getElementById('show-code-btn').addEventListener('click', () => {
+      if (!this._detailCard.code) { this.openEditCard(this._detailCard); return; }
+      this.openFullscreenCode(this._detailCard);
+    });
     document.getElementById('toggle-history-btn').addEventListener('click', () => {
       const el = document.getElementById('detail-history-section');
       el.hidden = !el.hidden;
@@ -739,15 +746,24 @@ const App = {
     card.detailOpenCount = (card.detailOpenCount || 0) + 1;
     await DB.putCard(card);
     await DB.addHistory({ id: DB.uid(), cardId: card.id, type: 'detail', timestamp: Date.now() });
-    this.renderDetail(card);
+    // Show the modal BEFORE rendering the code: while hidden (display:none) the container
+    // has no layout, so measuring its width for the responsive barcode/QR sizing would be
+    // unreliable and produce an incorrectly-scaled (not full-width) result.
     this.showModal('modal-detail');
+    this.renderDetail(card);
     this.onDataChanged();
   },
 
   async renderDetail(card) {
     document.getElementById('detail-title').textContent = card.storeName;
-    const codeOpts = card.codeType === 'QR' ? { width: 400, height: 400, responsive: true } : { height: 150, width: 400, responsive: true };
-    renderCode(document.getElementById('detail-code-mini'), card.code, card.codeType, codeOpts);
+    const codeEl = document.getElementById('detail-code-mini');
+    if (!card.code) {
+      codeEl.classList.remove('code-square');
+      codeEl.innerHTML = `<span class="hint center">${i18n.t('code_missing_hint')}</span>`;
+    } else {
+      const codeOpts = card.codeType === 'QR' ? { width: 400, height: 400, responsive: true } : { height: 150, width: 400, responsive: true };
+      renderCode(codeEl, card.code, card.codeType, codeOpts);
+    }
     document.getElementById('detail-history-section').hidden = true;
     document.getElementById('detail-uses').textContent = card.useCount || 0;
     document.getElementById('detail-last-used').textContent = this.formatLastUsed(card.lastUsedAt);
@@ -803,14 +819,15 @@ const App = {
   },
 
   async openFullscreenCode(card) {
+    if (!card.code) { this.openEditCard(card); return; }
     this._fsStartedAt = Date.now();
     document.getElementById('fs-store-name').textContent = card.storeName;
     this.fsZoom = 100; this.fsRotated = false;
     document.getElementById('fs-zoom').value = 100;
+    document.getElementById('modal-fullscreen-code').hidden = false;
     const fsOpts = card.codeType === 'QR' ? { width: 500, height: 500, responsive: true } : { height: 180, width: 500, responsive: true };
     renderCode(document.getElementById('fs-code-container'), card.code, card.codeType, fsOpts);
     this.applyFsTransform();
-    document.getElementById('modal-fullscreen-code').hidden = false;
 
     card.useCount = (card.useCount || 0) + 1;
     card.lastUsedAt = Date.now();
@@ -1079,6 +1096,12 @@ const App = {
 
   // ---------------- Generic UI helpers ----------------
   showModal(id) {
+    // A lingering focused input in the background (e.g. the cards-list search box) can keep
+    // showing its native autofill/suggestions popup on top of the modal on Android - blur
+    // whatever's focused before revealing the modal to prevent that.
+    if (document.activeElement && typeof document.activeElement.blur === 'function' && document.activeElement !== document.body) {
+      document.activeElement.blur();
+    }
     const el = document.getElementById(id);
     el.style.height = '';
     el.hidden = false;

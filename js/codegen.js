@@ -18,8 +18,18 @@ function guessCodeType(value) {
 // Makes a rendered barcode <svg> scale fluidly to its container's width while preserving
 // aspect ratio, by converting its fixed pixel size into a viewBox.
 function makeSvgResponsive(svg) {
-  const w = svg.width && svg.width.baseVal ? svg.width.baseVal.value : null;
-  const h = svg.height && svg.height.baseVal ? svg.height.baseVal.value : null;
+  let w = null;
+  let h = null;
+  // getBBox() measures the actual rendered geometry and is more reliable across browsers/
+  // timing than reading the width/height presentation attributes JsBarcode set.
+  try {
+    const bbox = svg.getBBox();
+    if (bbox && bbox.width && bbox.height) { w = bbox.width; h = bbox.height; }
+  } catch (e) { /* element may not be rendered yet - fall back below */ }
+  if (!w || !h) {
+    w = svg.width && svg.width.baseVal ? svg.width.baseVal.value : null;
+    h = svg.height && svg.height.baseVal ? svg.height.baseVal.value : null;
+  }
   if (w && h) {
     svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
     svg.removeAttribute('width');

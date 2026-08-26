@@ -127,6 +127,11 @@ const I18N = {
     backup_before_reset_desc: 'Predtym ako vsetko vymazes, odporucame vytvorit zalohu. Co chces urobit?',
     backup_then_delete: 'Zalohovat a vymazat',
     delete_without_backup: 'Vymazat bez zalohy',
+    untitled_card: 'Bez nazvu obchodu',
+    saved_missing_code: 'Karta bola pridana, no nebol vyplneny kod.',
+    saved_missing_name: 'Karta bola pridana, no nebol vyplneny nazov.',
+    saved_missing_both: 'Karta bola pridana, no chyba nazov aj kod.',
+    code_missing_hint: 'Kod nie je vyplneny. Klepnutim upravis kartu.',
   },
   en: {
     appName: 'LoyalCards',
@@ -255,6 +260,11 @@ const I18N = {
     backup_before_reset_desc: 'Before erasing everything, we recommend making a backup. What would you like to do?',
     backup_then_delete: 'Back up and erase',
     delete_without_backup: 'Erase without backup',
+    untitled_card: 'Untitled store',
+    saved_missing_code: 'Card was added, but no code was entered.',
+    saved_missing_name: 'Card was added, but no name was entered.',
+    saved_missing_both: 'Card was added, but name and code are both missing.',
+    code_missing_hint: 'No code entered yet. Tap to edit this card.',
   }
 };
 

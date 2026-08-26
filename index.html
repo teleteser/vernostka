@@ -28,7 +28,7 @@
     <div class="search-row">
       <div class="search-box">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        <input type="search" id="search-input" data-i18n-placeholder="search_placeholder" placeholder="Hladat kartu...">
+        <input type="search" id="search-input" autocomplete="off" data-i18n-placeholder="search_placeholder" placeholder="Hladat kartu...">
       </div>
       <button id="sort-btn" class="icon-btn" aria-label="Sort" title="Sort">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M6 12h12M10 18h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -160,7 +160,7 @@
       <div id="manual-pane" class="capture-pane" hidden>
         <div class="code-preview" id="manual-code-preview"></div>
         <label class="field-label" data-i18n="card_code_label">Cislo / kod karty</label>
-        <input type="text" id="field-code" data-i18n-placeholder="card_code_placeholder" placeholder="Naskenuj alebo zadaj cislo">
+        <input type="text" id="field-code" autocomplete="off" data-i18n-placeholder="card_code_placeholder" placeholder="Naskenuj alebo zadaj cislo">
         <label class="field-label" data-i18n="code_type_label">Typ kodu</label>
         <select id="field-code-type"></select>
       </div>
@@ -169,14 +169,14 @@
         <label class="field-label" data-i18n="store_name_label">Nazov obchodu</label>
         <div class="store-name-row">
           <div id="store-logo-preview" class="store-logo-preview"></div>
-          <input type="text" id="field-store-name" data-i18n-placeholder="store_name_placeholder" placeholder="napr. Lidl">
+          <input type="text" id="field-store-name" autocomplete="off" data-i18n-placeholder="store_name_placeholder" placeholder="napr. Lidl">
         </div>
         <div id="store-suggestions" class="store-suggestions"></div>
 
         <div class="appearance-row">
           <div class="appearance-field">
             <label data-i18n="abbreviation_label">Skratka karty</label>
-            <input type="text" id="field-abbreviation" maxlength="3" data-i18n-placeholder="abbreviation_placeholder" placeholder="napr. LI">
+            <input type="text" id="field-abbreviation" autocomplete="off" maxlength="3" data-i18n-placeholder="abbreviation_placeholder" placeholder="napr. LI">
           </div>
           <div class="appearance-field">
             <label data-i18n="logo_color_label">Farba policka</label>
@@ -197,7 +197,7 @@
         <select id="field-category"></select>
 
         <label class="field-label" data-i18n="note_label">Poznamka (nepovinne)</label>
-        <textarea id="field-note" rows="2" data-i18n-placeholder="note_placeholder" placeholder="napr. PIN..."></textarea>
+        <textarea id="field-note" rows="2" autocomplete="off" data-i18n-placeholder="note_placeholder" placeholder="napr. PIN..."></textarea>
 
         <label class="field-label" data-i18n="location_label">Poloha obchodu (nepovinne)</label>
         <p class="hint" data-i18n="location_permission_note">GPS poloha je nepovinna.</p>
@@ -217,7 +217,7 @@
       <button class="text-btn" id="map-save-btn" data-i18n="save">Ulozit</button>
     </header>
     <div class="modal-body no-pad">
-      <input type="text" id="location-name-input" class="location-name-input" data-i18n-placeholder="location_name_placeholder" placeholder="napr. Lidl Dunajska Streda">
+      <input type="text" id="location-name-input" class="location-name-input" autocomplete="off" data-i18n-placeholder="location_name_placeholder" placeholder="napr. Lidl Dunajska Streda">
       <p class="hint center" data-i18n="map_pick_hint">Klikni na mapu.</p>
       <div id="map-container"></div>
       <button id="map-use-current-btn" class="btn btn-ghost" data-i18n="map_use_current">Pouzit moju polohu</button>
