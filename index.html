@@ -145,15 +145,23 @@
         <p class="hint center" data-i18n="scan_hint">Namier fotoaparat na kod.</p>
         <div class="btn-row center">
           <button id="switch-camera-btn" class="btn btn-ghost small" data-i18n="scan_switch_camera">Prepnut kameru</button>
+          <button id="photo-scan-btn" class="btn btn-ghost small" data-i18n="photo_scan_button">Odfotit kod</button>
         </div>
+        <input type="file" id="photo-scan-input" accept="image/*" capture="environment" hidden>
         <div id="camera-denied" class="camera-denied" hidden>
           <p class="hint"><strong data-i18n="camera_denied_title">Pristup ku kamere nie je povoleny</strong></p>
           <p class="hint" data-i18n="camera_denied_desc">Povol pristup ku kamere v nastaveniach.</p>
-          <button id="camera-denied-manual-btn" class="btn btn-secondary" data-i18n="use_manual_instead">Zadat kod rucne</button>
+          <div class="btn-row center">
+            <button id="camera-denied-photo-btn" class="btn btn-secondary small" data-i18n="photo_scan_button">Odfotit kod</button>
+            <button id="camera-denied-manual-btn" class="btn btn-secondary small" data-i18n="use_manual_instead">Zadat kod rucne</button>
+          </div>
         </div>
         <div id="scan-slow-hint" class="scan-slow-hint" hidden>
           <p class="hint" data-i18n="scan_slow_hint">Nedari sa naskenovat?</p>
-          <button id="scan-slow-manual-btn" class="btn btn-ghost small" data-i18n="use_manual_instead">Zadat kod rucne</button>
+          <div class="btn-row center">
+            <button id="scan-slow-photo-btn" class="btn btn-ghost small" data-i18n="photo_scan_button">Odfotit kod</button>
+            <button id="scan-slow-manual-btn" class="btn btn-ghost small" data-i18n="use_manual_instead">Zadat kod rucne</button>
+          </div>
         </div>
       </div>
 
@@ -241,7 +249,8 @@
       </button>
 
       <div class="detail-actions-row">
-        <div class="stat-pill"><strong id="detail-uses">0</strong><span data-i18n="uses_label">pouzitia</span></div>
+        <div class="stat-pill"><strong id="detail-uses">0</strong><span data-i18n="code_shows_label">Zobrazenia kodu</span></div>
+        <div class="stat-pill"><strong id="detail-preview-opens">0</strong><span data-i18n="preview_opens_label">Nahlady</span></div>
         <div class="stat-pill"><span data-i18n="last_used">Naposledy</span><strong id="detail-last-used">-</strong></div>
         <button id="toggle-history-btn" class="stat-pill pill-button" data-i18n="history_title">Historia</button>
       </div>
@@ -259,14 +268,20 @@
 
   <!-- ===================== FULLSCREEN CODE VIEW ===================== -->
   <div id="modal-fullscreen-code" class="fullscreen-code" hidden>
-    <button id="fs-close-btn" class="fs-close-btn" aria-label="Close">
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#111" stroke-width="2.4" stroke-linecap="round"/></svg>
-    </button>
-    <div id="fs-store-name" class="fs-store-name"></div>
-    <div id="fs-code-container" class="fs-code-container"></div>
+    <div class="fs-header">
+      <button id="fs-close-btn" class="fs-close-btn" aria-label="Close">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#111" stroke-width="2.4" stroke-linecap="round"/></svg>
+      </button>
+      <div id="fs-store-name" class="fs-store-name"></div>
+      <div class="fs-header-spacer"></div>
+    </div>
+    <div id="fs-code-stage" class="fs-code-stage">
+      <div id="fs-code-container" class="fs-code-container"></div>
+    </div>
     <div class="fs-controls">
       <button id="fs-rotate-btn" class="btn btn-ghost small" data-i18n="fullscreen_rotate">Otocit</button>
       <input type="range" id="fs-zoom" min="60" max="150" value="100">
+      <button id="fs-reset-position-btn" class="btn btn-ghost small" data-i18n="position_reset">Predvolena poloha</button>
     </div>
   </div>
 

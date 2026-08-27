@@ -320,15 +320,18 @@ p { margin: 0.35em 0; }
 .scan-slow-hint { text-align: center; margin-top: 10px; }
 .scan-slow-hint button { margin-top: 6px; }
 
-.code-preview { display: flex; align-items: center; justify-content: center; min-height: 140px; width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 14px; }
+/* Codes must stay scannable regardless of app theme - always render on a white card,
+   even in dark mode, otherwise a real barcode/QR scanner sees poor (dark-on-dark) contrast. */
+.code-preview { display: flex; align-items: center; justify-content: center; min-height: 140px; width: 100%; background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 14px; box-shadow: 0 0 0 1px rgba(0,0,0,0.04); }
 .code-preview svg, .code-preview img { max-width: 100%; height: auto; }
 .code-preview .qr-holder { width: 100%; display: flex; align-items: center; justify-content: center; }
 .code-preview.code-square { aspect-ratio: 1 / 1; }
+.code-preview .hint { color: #555; }
 .code-preview.code-square .qr-holder,
 .code-preview.code-square .qr-holder canvas,
 .code-preview.code-square .qr-holder img,
 .code-preview.code-square .qr-holder table { width: 100%; height: 100%; }
-.code-render-error { font-size: 13px; color: var(--text-muted); word-break: break-all; }
+.code-render-error { font-size: 13px; color: #444; word-break: break-all; }
 
 
 .field-label { display: block; font-size: 12.5px; font-weight: 700; color: var(--text-muted); margin: 16px 0 6px; text-transform: uppercase; letter-spacing: 0.03em; }
@@ -399,7 +402,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 .detail-code-frame .code-preview { margin: 0; border-radius: 0; }
 .tap-hint { font-size: 12.5px; color: var(--text-muted); font-weight: 600; }
 
-.detail-actions-row { display: flex; gap: 10px; margin: 0 0 16px; }
+.detail-actions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 16px; }
 .stat-pill { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 8px; text-align: center; }
 .stat-pill strong { display: block; font-size: 18px; color: var(--primary); }
 [data-theme="dark"] .stat-pill strong { color: #EAF0F6; }
@@ -419,12 +422,46 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   position: fixed; inset: 0;
   background: #fff;
   z-index: 100;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 20px 10px;
+  display: flex; flex-direction: column;
+  padding: 0;
 }
-.fs-close-btn { position: absolute; top: calc(16px + var(--safe-top)); left: 16px; background: none; border: none; }
-.fs-store-name { color: #111; font-weight: 800; font-size: 18px; margin-bottom: 14px; }
-.fs-code-container { width: 100%; display: flex; align-items: center; justify-content: center; transition: transform 0.15s; }
+.fs-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(14px + var(--safe-top)) 16px 10px;
+  flex-shrink: 0;
+}
+.fs-close-btn { background: none; border: none; flex-shrink: 0; padding: 4px; }
+.fs-header-spacer { width: 24px; flex-shrink: 0; }
+.fs-store-name {
+  flex: 1;
+  text-align: center;
+  color: #111;
+  font-weight: 800;
+  font-size: 17px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The code sits in its own flexible "stage" region, absolutely positioned within it so it
+   can be dragged to - and remembered at - a custom spot, independent of the header above and
+   the size/rotate controls below (so enlarging it can never cover the store name anymore). */
+.fs-code-stage {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  touch-action: none;
+}
+.fs-code-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 95%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: grab;
+}
+.fs-code-container.dragging { cursor: grabbing; }
 .fs-code-container.code-square { aspect-ratio: 1 / 1; }
 .fs-code-container.code-square .qr-holder,
 .fs-code-container.code-square .qr-holder canvas,
@@ -432,8 +469,13 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 .fs-code-container.code-square .qr-holder table { width: 100%; height: 100%; }
 .fs-code-container svg { width: 100%; height: auto; }
 .fs-code-container .qr-holder { width: 100%; display: flex; align-items: center; justify-content: center; }
-.fs-controls { position: absolute; bottom: calc(24px + var(--safe-bottom)); display: flex; align-items: center; gap: 14px; width: 80%; }
+.fs-controls {
+  flex-shrink: 0;
+  padding: 12px 20px calc(18px + var(--safe-bottom));
+  display: flex; align-items: center; gap: 12px;
+}
 .fs-controls input[type=range] { flex: 1; }
+.fs-controls .btn.small { flex-shrink: 0; }
 
 .modal-overlay {
   position: fixed; inset: 0;

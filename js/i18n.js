@@ -133,6 +133,13 @@ const I18N = {
     saved_missing_both: 'Karta bola pridana, no chyba nazov aj kod.',
     code_missing_hint: 'Kod nie je vyplneny. Klepnutim upravis kartu.',
     saved_title: 'Ulozene',
+    photo_scan_button: 'Odfotit kod',
+    photo_scan_processing: 'Rozpoznavam kod z fotky...',
+    photo_scan_failed: 'Kod sa z fotky nepodarilo rozpoznat. Skus to znova alebo zadaj kod rucne.',
+    preview_opens_label: 'Nahlady',
+    code_shows_label: 'Zobrazenia kodu',
+    position_label: 'Poloha kodu na obrazovke',
+    position_reset: 'Predvolena poloha',
   },
   en: {
     appName: 'LoyalCards',
@@ -267,6 +274,13 @@ const I18N = {
     saved_missing_both: 'Card was added, but name and code are both missing.',
     code_missing_hint: 'No code entered yet. Tap to edit this card.',
     saved_title: 'Saved',
+    photo_scan_button: 'Take a photo',
+    photo_scan_processing: 'Reading code from photo...',
+    photo_scan_failed: 'Could not read a code from that photo. Try again or enter it manually.',
+    preview_opens_label: 'Previews',
+    code_shows_label: 'Code shown',
+    position_label: 'Code position on screen',
+    position_reset: 'Reset position',
   }
 };
 

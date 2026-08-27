@@ -231,7 +231,7 @@ const App = {
       <div class="card-logo" ${logoStyle}>${logoInner}</div>
       <div class="card-row-info">
         <div class="card-row-name">${displayName}${draftBadge}</div>
-        <div class="card-row-meta">${card.useCount || 0} ${i18n.t('uses_label')} · ${this.formatLastUsed(card.lastUsedAt)}</div>
+        <div class="card-row-meta">${card.useCount || 0} ${i18n.t('uses_label')} · ${this.formatLastUsed(this.mostRecentActivity(card))}</div>
       </div>
       <div class="card-row-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     `;
@@ -252,6 +252,12 @@ const App = {
   },
 
   initialLetter(name) { return (name || '?').trim().charAt(0).toUpperCase(); },
+  mostRecentActivity(card) {
+    const a = card.lastUsedAt || 0;
+    const b = card.lastDetailOpenAt || 0;
+    const max = Math.max(a, b);
+    return max > 0 ? max : null;
+  },
   cardAbbreviation(card) {
     if (card.abbreviation && card.abbreviation.trim()) return card.abbreviation.trim().slice(0, 3).toUpperCase();
     return this.initialLetter(card.storeName);
@@ -314,6 +320,25 @@ const App = {
       if (this.scanner) this.scanner.switchCamera((r) => this.handleScanResult(r), (e) => this.handleCameraError(e));
     });
 
+    const photoInput = document.getElementById('photo-scan-input');
+    const triggerPhotoScan = () => photoInput.click();
+    document.getElementById('photo-scan-btn').addEventListener('click', triggerPhotoScan);
+    document.getElementById('camera-denied-photo-btn').addEventListener('click', triggerPhotoScan);
+    document.getElementById('scan-slow-photo-btn').addEventListener('click', triggerPhotoScan);
+    photoInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      this.toast(i18n.t('photo_scan_processing'));
+      try {
+        const result = await Scanner.decodeFromFile(file);
+        await this.handleScanResult(result);
+      } catch (err) {
+        console.warn('photo decode failed', err);
+        this.toast(i18n.t('photo_scan_failed'));
+      }
+    });
+
     document.getElementById('edit-delete-card-btn').addEventListener('click', async () => {
       const ok = await this.confirmDialog(
         i18n.t('delete_card_title'),
@@ -336,9 +361,10 @@ const App = {
       this.editingCard.useCount = 0;
       this.editingCard.detailOpenCount = 0;
       this.editingCard.lastUsedAt = null;
+      this.editingCard.lastDetailOpenAt = null;
       await DB.putCard(this.editingCard);
       if (this._detailCard && this._detailCard.id === this.editingCard.id) {
-        Object.assign(this._detailCard, { useCount: 0, detailOpenCount: 0, lastUsedAt: null });
+        Object.assign(this._detailCard, { useCount: 0, detailOpenCount: 0, lastUsedAt: null, lastDetailOpenAt: null });
       }
       this.toast(i18n.t('delete_history_title'));
       this.onDataChanged();
@@ -746,6 +772,7 @@ const App = {
     this._detailCard = card;
     // record "detail open" interaction
     card.detailOpenCount = (card.detailOpenCount || 0) + 1;
+    card.lastDetailOpenAt = Date.now();
     await DB.putCard(card);
     await DB.addHistory({ id: DB.uid(), cardId: card.id, type: 'detail', timestamp: Date.now() });
     // Show the modal BEFORE rendering the code: while hidden (display:none) the container
@@ -771,7 +798,8 @@ const App = {
     }
     document.getElementById('detail-history-section').hidden = true;
     document.getElementById('detail-uses').textContent = card.useCount || 0;
-    document.getElementById('detail-last-used').textContent = this.formatLastUsed(card.lastUsedAt);
+    document.getElementById('detail-preview-opens').textContent = card.detailOpenCount || 0;
+    document.getElementById('detail-last-used').textContent = this.formatLastUsed(this.mostRecentActivity(card));
     const noteTitle = document.getElementById('detail-note-title');
     const noteEl = document.getElementById('detail-note');
     if (card.note) { noteTitle.hidden = false; noteEl.textContent = card.note; }
@@ -816,18 +844,73 @@ const App = {
       this.fsZoom = Number(e.target.value);
       this.applyFsTransform();
     });
+    document.getElementById('fs-reset-position-btn').addEventListener('click', () => {
+      this.fsPosX = 0;
+      this.fsPosY = 0;
+      this.applyFsTransform();
+      this.saveFsPosition();
+    });
+    this.bindFullscreenDrag();
+  },
+
+  bindFullscreenDrag() {
+    const el = document.getElementById('fs-code-container');
+    let dragging = false;
+    let startX = 0;
+    let startY = 0;
+    let origX = 0;
+    let origY = 0;
+
+    const onDown = (e) => {
+      dragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      origX = this.fsPosX || 0;
+      origY = this.fsPosY || 0;
+      el.classList.add('dragging');
+      el.setPointerCapture && el.setPointerCapture(e.pointerId);
+    };
+    const onMove = (e) => {
+      if (!dragging) return;
+      this.fsPosX = origX + (e.clientX - startX);
+      this.fsPosY = origY + (e.clientY - startY);
+      this.applyFsTransform();
+    };
+    const onUp = () => {
+      if (!dragging) return;
+      dragging = false;
+      el.classList.remove('dragging');
+      this.saveFsPosition();
+    };
+
+    el.addEventListener('pointerdown', onDown);
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+    el.addEventListener('pointercancel', onUp);
+  },
+
+  async saveFsPosition() {
+    if (!this._fsCard) return;
+    this._fsCard.codePosX = this.fsPosX || 0;
+    this._fsCard.codePosY = this.fsPosY || 0;
+    await DB.putCard(this._fsCard);
   },
 
   applyFsTransform() {
     const el = document.getElementById('fs-code-container');
-    el.style.transform = `rotate(${this.fsRotated ? 90 : 0}deg) scale(${this.fsZoom / 100})`;
+    const x = this.fsPosX || 0;
+    const y = this.fsPosY || 0;
+    el.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px) rotate(${this.fsRotated ? 90 : 0}deg) scale(${this.fsZoom / 100})`;
   },
 
   async openFullscreenCode(card) {
     if (!card.code) { this.openEditCard(card); return; }
     this._fsStartedAt = Date.now();
+    this._fsCard = card;
     document.getElementById('fs-store-name').textContent = card.storeName;
     this.fsZoom = 100; this.fsRotated = false;
+    this.fsPosX = card.codePosX || 0;
+    this.fsPosY = card.codePosY || 0;
     document.getElementById('fs-zoom').value = 100;
     document.getElementById('modal-fullscreen-code').hidden = false;
     void document.getElementById('modal-fullscreen-code').offsetHeight;
