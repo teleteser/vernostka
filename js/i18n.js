@@ -140,6 +140,10 @@ const I18N = {
     code_shows_label: 'Zobrazenia kodu',
     position_label: 'Poloha kodu na obrazovke',
     position_reset: 'Predvolena poloha',
+    bulk_assign_button: 'Priradit kategoriu',
+    bulk_assign_title: 'Priradit kategoriu',
+    bulk_assign_desc: 'Vyber kategoriu pre {count} vybranych kariet.',
+    bulk_assign_done: 'Kategoria bola priradena {count} kartam.',
   },
   en: {
     appName: 'LoyalCards',
@@ -281,6 +285,10 @@ const I18N = {
     code_shows_label: 'Code shown',
     position_label: 'Code position on screen',
     position_reset: 'Reset position',
+    bulk_assign_button: 'Assign category',
+    bulk_assign_title: 'Assign category',
+    bulk_assign_desc: 'Choose a category for {count} selected cards.',
+    bulk_assign_done: 'Category assigned to {count} cards.',
   }
 };
 

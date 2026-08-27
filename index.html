@@ -33,11 +33,20 @@
       <button id="sort-btn" class="icon-btn" aria-label="Sort" title="Sort">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M6 12h12M10 18h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
+      <button id="select-mode-btn" class="icon-btn" aria-label="Select multiple" title="Select multiple">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><path d="M15.5 16.3l1.6 1.6 3.2-3.4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
     </div>
 
     <div id="category-chips" class="chip-row"></div>
 
     <div id="cards-list" class="cards-list"></div>
+
+    <div id="selection-bar" class="selection-bar" hidden>
+      <span id="selection-count">0</span>
+      <button id="selection-assign-btn" class="btn btn-secondary small" data-i18n="bulk_assign_button">Priradit kategoriu</button>
+      <button id="selection-cancel-btn" class="btn btn-ghost small" data-i18n="cancel">Zrusit</button>
+    </div>
 
     <div id="empty-state" class="empty-state" hidden>
       <div class="empty-illustration">
@@ -294,6 +303,16 @@
         <button id="confirm-cancel-btn" class="btn btn-ghost" data-i18n="cancel">Zrusit</button>
         <button id="confirm-ok-btn" class="btn btn-danger" data-i18n="confirm">Potvrdit</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ===================== BULK CATEGORY ASSIGN DIALOG ===================== -->
+  <div id="modal-bulk-category" class="modal-overlay" hidden>
+    <div class="modal-sheet">
+      <h3 data-i18n="bulk_assign_title">Priradit kategoriu</h3>
+      <p id="bulk-assign-desc"></p>
+      <div id="bulk-category-list" class="chip-row wrap"></div>
+      <button id="bulk-category-cancel-btn" class="btn btn-ghost" data-i18n="cancel">Zrusit</button>
     </div>
   </div>
 

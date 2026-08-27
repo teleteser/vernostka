@@ -18,7 +18,8 @@ const App = {
     this.applyTheme();
     this.applyLangToDom();
     await this.ensureDefaultCategories();
-    this.categories = await DB.getAllCategories();
+    await this.dedupeCategories();
+    await this.loadCategories();
     this.cards = await DB.getAllCards();
 
     this.bindNav();
@@ -103,12 +104,62 @@ const App = {
   },
 
   async ensureDefaultCategories() {
+    // Built-in categories always use a fixed, deterministic id (not a random one) so that
+    // re-seeding (or merging in a backup that also contains its own copy of the defaults)
+    // can never create duplicates - putCategory() with the same id just overwrites in place.
     const existing = await DB.getAllCategories();
-    if (existing.length === 0) {
-      for (const key of DEFAULT_CATEGORIES) {
-        await DB.putCategory({ id: DB.uid(), builtin: key, name: null });
+    const existingBuiltinKeys = new Set(existing.filter((c) => c.builtin).map((c) => c.builtin));
+    let order = existing.reduce((max, c) => Math.max(max, c.order || 0), -1) + 1;
+    for (const key of DEFAULT_CATEGORIES) {
+      if (!existingBuiltinKeys.has(key)) {
+        await DB.putCategory({ id: 'default-' + key, builtin: key, name: null, order: order++ });
       }
     }
+  },
+
+  // One-time cleanup for data that already ended up with duplicate categories (e.g. from
+  // restoring a backup that itself contained its own copy of the default categories under
+  // different ids). Cards pointing at a duplicate are re-pointed to the surviving category
+  // before the duplicate is deleted.
+  async dedupeCategories() {
+    const cats = await DB.getAllCategories();
+    const groups = new Map();
+    cats.forEach((c) => {
+      const key = c.builtin ? `b:${c.builtin}` : `n:${(c.name || '').trim().toLowerCase()}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(c);
+    });
+    let changed = false;
+    for (const group of groups.values()) {
+      if (group.length <= 1) continue;
+      changed = true;
+      group.sort((a, b) => {
+        const aStable = a.id.startsWith('default-') ? 0 : 1;
+        const bStable = b.id.startsWith('default-') ? 0 : 1;
+        if (aStable !== bStable) return aStable - bStable;
+        return (a.order || 0) - (b.order || 0);
+      });
+      const survivor = group[0];
+      const duplicates = group.slice(1);
+      const allCards = await DB.getAllCards();
+      for (const dup of duplicates) {
+        for (const card of allCards) {
+          if (card.categoryId === dup.id) {
+            card.categoryId = survivor.id;
+            await DB.putCard(card);
+          }
+        }
+        await DB.deleteCategory(dup.id);
+      }
+    }
+    return changed;
+  },
+
+  async loadCategories() {
+    const cats = await DB.getAllCategories();
+    cats.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    this.categories = cats;
+    return cats;
   },
 
   categoryLabel(cat) {
@@ -143,6 +194,69 @@ const App = {
     document.getElementById('fab-add').addEventListener('click', () => this.openAddCard());
     document.getElementById('empty-add-btn').addEventListener('click', () => this.openAddCard());
     document.getElementById('sort-btn').addEventListener('click', () => this.cycleSort());
+
+    document.getElementById('select-mode-btn').addEventListener('click', () => this.toggleSelectionMode());
+    document.getElementById('selection-cancel-btn').addEventListener('click', () => this.toggleSelectionMode(false));
+    document.getElementById('selection-assign-btn').addEventListener('click', () => this.openBulkCategoryAssign());
+    document.getElementById('bulk-category-cancel-btn').addEventListener('click', () => this.hideModal('modal-bulk-category'));
+  },
+
+  selectionMode: false,
+  selectedCardIds: new Set(),
+
+  toggleSelectionMode(force) {
+    this.selectionMode = typeof force === 'boolean' ? force : !this.selectionMode;
+    if (!this.selectionMode) this.selectedCardIds.clear();
+    document.getElementById('select-mode-btn').classList.toggle('active-icon', this.selectionMode);
+    document.getElementById('fab-add').hidden = this.selectionMode;
+    this.updateSelectionBar();
+    this.renderCardsList();
+  },
+
+  toggleCardSelection(cardId) {
+    if (this.selectedCardIds.has(cardId)) this.selectedCardIds.delete(cardId);
+    else this.selectedCardIds.add(cardId);
+    this.updateSelectionBar();
+    this.renderCardsList();
+  },
+
+  updateSelectionBar() {
+    const bar = document.getElementById('selection-bar');
+    bar.hidden = !this.selectionMode;
+    document.getElementById('selection-count').textContent = String(this.selectedCardIds.size);
+    document.getElementById('selection-assign-btn').disabled = this.selectedCardIds.size === 0;
+  },
+
+  openBulkCategoryAssign() {
+    if (this.selectedCardIds.size === 0) return;
+    document.getElementById('bulk-assign-desc').textContent = i18n.t('bulk_assign_desc', { count: this.selectedCardIds.size });
+    const listEl = document.getElementById('bulk-category-list');
+    listEl.innerHTML = '';
+    this.categories.forEach((cat) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip';
+      chip.textContent = this.categoryLabel(cat);
+      chip.addEventListener('click', () => this.applyBulkCategory(cat.id));
+      listEl.appendChild(chip);
+    });
+    this.showModal('modal-bulk-category');
+  },
+
+  async applyBulkCategory(categoryId) {
+    const ids = Array.from(this.selectedCardIds);
+    for (const id of ids) {
+      const card = await DB.getCard(id);
+      if (card) {
+        card.categoryId = categoryId;
+        await DB.putCard(card);
+      }
+    }
+    this.hideModal('modal-bulk-category');
+    this.toast(i18n.t('bulk_assign_done', { count: ids.length }));
+    this.toggleSelectionMode(false);
+    await this.renderCardsList();
+    this.onDataChanged();
   },
 
   cycleSort() {
@@ -227,7 +341,12 @@ const App = {
     const logoStyle = card.logo ? '' : `style="background:${bg};color:${fg};"`;
     const draftBadge = card.isDraft ? `<span class="draft-badge">${i18n.t('draft_label')}</span>` : '';
     const displayName = card.storeName && card.storeName.trim() ? this.escapeHtml(card.storeName) : `${i18n.t('draft_label')} ${this._draftDisplayIndex(card)}`;
+    const checked = this.selectionMode && this.selectedCardIds.has(card.id);
+    const checkboxHtml = this.selectionMode
+      ? `<div class="card-row-checkbox${checked ? ' checked' : ''}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`
+      : '';
     row.innerHTML = `
+      ${checkboxHtml}
       <div class="card-logo" ${logoStyle}>${logoInner}</div>
       <div class="card-row-info">
         <div class="card-row-name">${displayName}${draftBadge}</div>
@@ -236,6 +355,7 @@ const App = {
       <div class="card-row-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     `;
     row.addEventListener('click', () => {
+      if (this.selectionMode) { this.toggleCardSelection(card.id); return; }
       if (card.isDraft) this.openEditCard(card);
       else this.openCardDetail(card);
     });
@@ -962,8 +1082,9 @@ const App = {
     document.getElementById('settings-add-category').addEventListener('click', async () => {
       const name = prompt(i18n.t('category_new_placeholder'));
       if (!name || !name.trim()) return;
-      await DB.putCategory({ id: DB.uid(), builtin: null, name: name.trim() });
-      this.categories = await DB.getAllCategories();
+      const nextOrder = this.categories.reduce((max, c) => Math.max(max, c.order || 0), -1) + 1;
+      await DB.putCategory({ id: DB.uid(), builtin: null, name: name.trim(), order: nextOrder });
+      await this.loadCategories();
       this.renderSettingsCategories();
       this.renderCategoryChips();
       this.renderCategorySelect();
@@ -1030,15 +1151,44 @@ const App = {
     });
   },
 
+  async moveCategory(cat, direction) {
+    const idx = this.categories.findIndex((c) => c.id === cat.id);
+    const swapIdx = idx + direction;
+    if (idx === -1 || swapIdx < 0 || swapIdx >= this.categories.length) return;
+    const other = this.categories[swapIdx];
+    const tmp = cat.order ?? idx;
+    cat.order = other.order ?? swapIdx;
+    other.order = tmp;
+    await DB.putCategory(cat);
+    await DB.putCategory(other);
+    await this.loadCategories();
+    this.renderSettingsCategories();
+    this.renderCategoryChips();
+    this.renderCategorySelect();
+    this.onDataChanged();
+  },
+
   renderSettingsCategories() {
     const el = document.getElementById('settings-category-list');
     el.innerHTML = '';
-    this.categories.forEach((cat) => {
+    this.categories.forEach((cat, idx) => {
       const row = document.createElement('div');
       row.className = 'settings-category-row';
       const canDelete = !cat.builtin;
       const label = this.escapeHtml(this.categoryLabel(cat));
-      row.innerHTML = `<span>${label}</span><div class="cat-row-actions"><button class="cat-rename-btn" aria-label="${i18n.t('rename')}">&#9998;</button>${canDelete ? `<button class="cat-delete-btn">${i18n.t('delete')}</button>` : ''}</div>`;
+      const upDisabled = idx === 0 ? 'disabled' : '';
+      const downDisabled = idx === this.categories.length - 1 ? 'disabled' : '';
+      row.innerHTML = `
+        <div class="cat-reorder-btns">
+          <button class="cat-move-btn" data-dir="-1" ${upDisabled} aria-label="Up">&#9650;</button>
+          <button class="cat-move-btn" data-dir="1" ${downDisabled} aria-label="Down">&#9660;</button>
+        </div>
+        <span class="cat-row-label">${label}</span>
+        <div class="cat-row-actions"><button class="cat-rename-btn" aria-label="${i18n.t('rename')}">&#9998;</button>${canDelete ? `<button class="cat-delete-btn">${i18n.t('delete')}</button>` : ''}</div>`;
+
+      row.querySelectorAll('.cat-move-btn').forEach((btn) => {
+        btn.addEventListener('click', () => this.moveCategory(cat, Number(btn.dataset.dir)));
+      });
 
       row.querySelector('.cat-rename-btn').addEventListener('click', async () => {
         const current = this.categoryLabel(cat);
@@ -1046,7 +1196,7 @@ const App = {
         if (!name || !name.trim() || name.trim() === current) return;
         cat.name = name.trim();
         await DB.putCategory(cat);
-        this.categories = await DB.getAllCategories();
+        await this.loadCategories();
         this.renderSettingsCategories();
         this.renderCategoryChips();
         this.renderCategorySelect();
@@ -1079,7 +1229,7 @@ const App = {
             for (const c of affected) await DB.deleteCard(c.id);
           }
           await DB.deleteCategory(cat.id);
-          this.categories = await DB.getAllCategories();
+          await this.loadCategories();
           this.renderSettingsCategories();
           this.renderCategoryChips();
           this.renderCategorySelect();
@@ -1098,9 +1248,9 @@ const App = {
       mode = await this.choiceDialog(i18n.t('import_merge_title'), i18n.t('import_merge_desc'), i18n.t('import_merge'), i18n.t('import_replace'));
     }
     await Backup.applyImport(payload, mode);
-    this.categories = await DB.getAllCategories();
-    if (this.categories.length === 0) await this.ensureDefaultCategories();
-    this.categories = await DB.getAllCategories();
+    await this.ensureDefaultCategories();
+    await this.dedupeCategories();
+    await this.loadCategories();
     this.renderCategoryChips();
     this.renderCategorySelect();
     this.renderSettingsCategories();
