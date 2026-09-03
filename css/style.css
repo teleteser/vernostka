@@ -308,8 +308,17 @@ p { margin: 0.35em 0; }
 .settings-category-row button { background: none; border: none; font-size: 13px; font-weight: 600; padding: 4px; }
 .settings-category-row .cat-rename-btn { color: var(--primary-light); font-size: 16px; }
 .settings-category-row .cat-delete-btn { color: var(--danger); }
-.cat-reorder-btns { display: flex; flex-direction: column; gap: 0; }
-.cat-move-btn { font-size: 10px; line-height: 1; padding: 3px 6px !important; color: var(--text-muted) !important; }
+.cat-reorder-btns { display: flex; flex-direction: row; gap: 4px; flex-shrink: 0; }
+.cat-move-btn {
+  font-size: 16px;
+  line-height: 1;
+  padding: 10px 12px !important;
+  color: var(--primary-light) !important;
+  background: var(--surface-2) !important;
+  border-radius: 8px !important;
+  min-width: 40px;
+}
+[data-theme="dark"] .cat-move-btn { color: #fff !important; }
 .cat-move-btn:disabled { opacity: 0.25; }
 
 .segmented {

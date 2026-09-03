@@ -1494,12 +1494,17 @@ const App = {
     const idx = this.categories.findIndex((c) => c.id === cat.id);
     const swapIdx = idx + direction;
     if (idx === -1 || swapIdx < 0 || swapIdx >= this.categories.length) return;
-    const other = this.categories[swapIdx];
-    const tmp = cat.order ?? idx;
-    cat.order = other.order ?? swapIdx;
-    other.order = tmp;
-    await DB.putCategory(cat);
-    await DB.putCategory(other);
+    const reordered = this.categories.slice();
+    const [moved] = reordered.splice(idx, 1);
+    reordered.splice(swapIdx, 0, moved);
+    // Reassign clean, sequential order values (0, 1, 2...) to the whole list based on its
+    // new position, rather than just swapping two order values. This also self-heals any
+    // category whose order was previously missing/colliding (e.g. from older data or an
+    // import) - a pure swap could get stuck on those instead of actually moving.
+    for (let i = 0; i < reordered.length; i++) {
+      reordered[i].order = i;
+      await DB.putCategory(reordered[i]);
+    }
     await this.loadCategories();
     this.renderSettingsCategories();
     this.renderCategoryChips();
@@ -1513,17 +1518,16 @@ const App = {
     this.categories.forEach((cat, idx) => {
       const row = document.createElement('div');
       row.className = 'settings-category-row';
-      const canDelete = !cat.builtin;
       const label = this.escapeHtml(this.categoryLabel(cat));
-      const upDisabled = idx === 0 ? 'disabled' : '';
       const downDisabled = idx === this.categories.length - 1 ? 'disabled' : '';
+      const upDisabled = idx === 0 ? 'disabled' : '';
       row.innerHTML = `
         <div class="cat-reorder-btns">
-          <button class="cat-move-btn" data-dir="-1" ${upDisabled} aria-label="Up">&#9650;</button>
           <button class="cat-move-btn" data-dir="1" ${downDisabled} aria-label="Down">&#9660;</button>
+          <button class="cat-move-btn" data-dir="-1" ${upDisabled} aria-label="Up">&#9650;</button>
         </div>
         <span class="cat-row-label">${label}</span>
-        <div class="cat-row-actions"><button class="cat-rename-btn" aria-label="${i18n.t('rename')}">&#9998;</button>${canDelete ? `<button class="cat-delete-btn">${i18n.t('delete')}</button>` : ''}</div>`;
+        <div class="cat-row-actions"><button class="cat-rename-btn" aria-label="${i18n.t('rename')}">&#9998;</button><button class="cat-delete-btn">${i18n.t('delete')}</button></div>`;
 
       row.querySelectorAll('.cat-move-btn').forEach((btn) => {
         btn.addEventListener('click', () => this.moveCategory(cat, Number(btn.dataset.dir)));
@@ -1543,40 +1547,42 @@ const App = {
         this.onDataChanged();
       });
 
-      if (canDelete) {
-        row.querySelector('.cat-delete-btn').addEventListener('click', async () => {
-          const label2 = this.categoryLabel(cat);
-          const otherCat = this.categories.find((c) => c.builtin === 'category_other' && c.id !== cat.id);
-          const choice = await this.threeWayDialog(
-            i18n.t('category_delete_choice_title'),
-            i18n.t('category_delete_choice_desc', { name: label2 }),
-            [
-              { label: i18n.t('cancel'), value: 'cancel', className: 'btn-ghost' },
-              { label: i18n.t('category_delete_move'), value: 'move', className: 'btn-secondary' },
-              { label: i18n.t('category_delete_remove_cards'), value: 'delete', className: 'btn-danger' }
-            ],
-            true
-          );
-          if (!choice || choice === 'cancel') return;
-          const allCards = await DB.getAllCards();
-          const affected = allCards.filter((c) => c.categoryId === cat.id);
-          if (choice === 'move') {
-            for (const c of affected) {
-              c.categoryId = otherCat ? otherCat.id : c.categoryId;
-              await DB.putCard(c);
-            }
-          } else if (choice === 'delete') {
-            for (const c of affected) await DB.deleteCard(c.id);
+      row.querySelector('.cat-delete-btn').addEventListener('click', async () => {
+        const label2 = this.categoryLabel(cat);
+        // Prefer "Ine" as the fallback target, but any other remaining category works if
+        // that one isn't available (e.g. it was deleted, or this very category IS "Ine").
+        const otherCat = this.categories.find((c) => c.builtin === 'category_other' && c.id !== cat.id)
+          || this.categories.find((c) => c.id !== cat.id);
+        const buttons = [
+          { label: i18n.t('cancel'), value: 'cancel', className: 'btn-ghost' }
+        ];
+        if (otherCat) buttons.push({ label: i18n.t('category_delete_move'), value: 'move', className: 'btn-secondary' });
+        buttons.push({ label: i18n.t('category_delete_remove_cards'), value: 'delete', className: 'btn-danger' });
+        const choice = await this.threeWayDialog(
+          i18n.t('category_delete_choice_title'),
+          i18n.t('category_delete_choice_desc', { name: label2 }),
+          buttons,
+          true
+        );
+        if (!choice || choice === 'cancel') return;
+        const allCards = await DB.getAllCards();
+        const affected = allCards.filter((c) => c.categoryId === cat.id);
+        if (choice === 'move') {
+          for (const c of affected) {
+            c.categoryId = otherCat ? otherCat.id : null;
+            await DB.putCard(c);
           }
-          await DB.deleteCategory(cat.id);
-          await this.loadCategories();
-          this.renderSettingsCategories();
-          this.renderCategoryChips();
-          this.renderCategorySelect();
-          await this.renderCardsList();
-          this.onDataChanged();
-        });
-      }
+        } else if (choice === 'delete') {
+          for (const c of affected) await DB.deleteCard(c.id);
+        }
+        await DB.deleteCategory(cat.id);
+        await this.loadCategories();
+        this.renderSettingsCategories();
+        this.renderCategoryChips();
+        this.renderCategorySelect();
+        await this.renderCardsList();
+        this.onDataChanged();
+      });
       el.appendChild(row);
     });
   },
