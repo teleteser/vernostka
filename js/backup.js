@@ -34,6 +34,80 @@ const Backup = {
     }
   },
 
+  // ---- Multi-card QR transfer ----
+  // Many cards at once usually won't fit in a single scannable QR code, so this splits the
+  // JSON into a sequence of frames the sender cycles through on-screen; the receiver keeps
+  // scanning (without stopping after the first hit) until it has collected every part, then
+  // reassembles and imports them all at once. If everything DOES fit in one frame, only a
+  // single QR is used - no cycling needed.
+  BULK_SINGLE_PREFIX: 'VRNKB1:',
+  BULK_MULTI_PREFIX: 'VRNKM1:',
+  BULK_CHUNK_SIZE: 500,
+
+  async buildBulkCardList(cardIds) {
+    const [allCards, allCategories] = await Promise.all([DB.getAllCards(), DB.getAllCategories()]);
+    const idSet = new Set(cardIds);
+    const categoryLabelById = (id) => {
+      const cat = allCategories.find((c) => c.id === id);
+      if (!cat) return '';
+      return (cat.name && cat.name.trim()) ? cat.name.trim() : (cat.builtin ? i18n.t(cat.builtin) : '');
+    };
+    return allCards
+      .filter((c) => idSet.has(c.id))
+      .map((c) => ({
+        n: c.storeName || '',
+        c: c.code || '',
+        t: c.codeType || 'CODE128',
+        cat: categoryLabelById(c.categoryId),
+        note: c.note || '',
+        ab: c.abbreviation || '',
+        lc: c.logoColor || '',
+        tc: c.logoTextColor || ''
+      }));
+  },
+
+  // Returns an array of QR-ready strings (frames) to display, one at a time, in sequence.
+  buildBulkQrFrames(cardList) {
+    const payloadStr = JSON.stringify(cardList);
+    if (payloadStr.length <= this.BULK_CHUNK_SIZE) {
+      return [this.BULK_SINGLE_PREFIX + payloadStr];
+    }
+    const total = Math.ceil(payloadStr.length / this.BULK_CHUNK_SIZE);
+    const frames = [];
+    for (let i = 0; i < total; i++) {
+      const chunk = payloadStr.slice(i * this.BULK_CHUNK_SIZE, (i + 1) * this.BULK_CHUNK_SIZE);
+      frames.push(`${this.BULK_MULTI_PREFIX}${i + 1}/${total}:${chunk}`);
+    }
+    return frames;
+  },
+
+  // A single-frame bulk transfer (small card list) - decodes straight to the card array.
+  decodeBulkFromQr(text) {
+    if (!text || typeof text !== 'string' || !text.startsWith(this.BULK_SINGLE_PREFIX)) return null;
+    try {
+      const arr = JSON.parse(text.slice(this.BULK_SINGLE_PREFIX.length));
+      return Array.isArray(arr) ? arr : null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  // One part of a multi-frame bulk transfer. Returns {index, total, chunk} or null if the
+  // text isn't one of our multi-part frames.
+  parseBulkQrFrame(text) {
+    if (!text || typeof text !== 'string' || !text.startsWith(this.BULK_MULTI_PREFIX)) return null;
+    const rest = text.slice(this.BULK_MULTI_PREFIX.length);
+    const colonIdx = rest.indexOf(':');
+    if (colonIdx === -1) return null;
+    const header = rest.slice(0, colonIdx);
+    const chunk = rest.slice(colonIdx + 1);
+    const parts = header.split('/');
+    const index = parseInt(parts[0], 10);
+    const total = parseInt(parts[1], 10);
+    if (!index || !total || index < 1 || index > total) return null;
+    return { index, total, chunk };
+  },
+
   async buildBackupPayload() {
     const [cards, history, categories, settings] = await Promise.all([
       DB.getAllCards(), DB.getAllHistory(), DB.getAllCategories(), DB.getAllSettings()

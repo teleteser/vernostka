@@ -204,7 +204,10 @@ const App = {
     document.getElementById('send-method-cancel-btn').addEventListener('click', () => this.hideModal('modal-send-method'));
     document.getElementById('send-via-file-btn').addEventListener('click', () => this.sendSelectedViaFile());
     document.getElementById('send-via-qr-btn').addEventListener('click', () => this.sendSelectedViaQr());
-    document.getElementById('send-qr-close-btn').addEventListener('click', () => { document.getElementById('modal-send-qr').hidden = true; });
+    document.getElementById('send-qr-close-btn').addEventListener('click', () => {
+      document.getElementById('modal-send-qr').hidden = true;
+      clearInterval(this._bulkQrTimer);
+    });
   },
 
   selectionMode: false,
@@ -281,7 +284,7 @@ const App = {
     if (this.selectedCardIds.size === 0) return;
     const count = this.selectedCardIds.size;
     document.getElementById('send-method-desc').textContent = i18n.t('send_choose_method_desc', { count });
-    document.getElementById('send-via-qr-btn').hidden = count !== 1;
+    document.getElementById('send-via-qr-btn').hidden = false;
     this.showModal('modal-send-method');
   },
 
@@ -294,17 +297,39 @@ const App = {
 
   async sendSelectedViaQr() {
     const ids = Array.from(this.selectedCardIds);
-    if (ids.length !== 1) return;
-    const card = await DB.getCard(ids[0]);
-    if (!card) return;
-    const cat = this.categories.find((c) => c.id === card.categoryId);
-    const qrText = Backup.encodeCardForQr(card, cat ? this.categoryLabel(cat) : '');
     this.hideModal('modal-send-method');
+    const cardList = await Backup.buildBulkCardList(ids);
+    this._bulkQrFrames = Backup.buildBulkQrFrames(cardList);
+    this._bulkQrIndex = 0;
     document.getElementById('modal-send-qr').hidden = false;
     void document.getElementById('modal-send-qr').offsetHeight;
-    const container = document.getElementById('send-qr-container');
-    renderCode(container, qrText, 'QR', { width: 400, height: 400 });
+    this.renderBulkQrFrame();
+    clearInterval(this._bulkQrTimer);
+    if (this._bulkQrFrames.length > 1) {
+      // Keep cycling continuously (looping back to the start) so the receiver can catch any
+      // frame it missed on a later pass, until the user closes this screen.
+      this._bulkQrTimer = setInterval(() => {
+        this._bulkQrIndex = (this._bulkQrIndex + 1) % this._bulkQrFrames.length;
+        this.renderBulkQrFrame();
+      }, 1800);
+    }
     this.toggleSelectionMode(false);
+  },
+
+  renderBulkQrFrame() {
+    const frame = this._bulkQrFrames[this._bulkQrIndex];
+    if (!frame) return;
+    const container = document.getElementById('send-qr-container');
+    // Bulk frames can contain long strings of arbitrary characters - use the lowest QR error
+    // correction level to maximize how much fits in one scannable code.
+    renderCode(container, frame, 'QR', { width: 400, height: 400, correctLevel: 'L' });
+    const progressEl = document.getElementById('send-qr-progress');
+    if (this._bulkQrFrames.length > 1) {
+      progressEl.hidden = false;
+      progressEl.textContent = i18n.t('send_qr_progress', { current: this._bulkQrIndex + 1, total: this._bulkQrFrames.length });
+    } else {
+      progressEl.hidden = true;
+    }
   },
 
   cycleSort() {
@@ -384,23 +409,25 @@ const App = {
     row.className = 'card-row';
     const bg = card.logoColor || '#1E3A5F';
     const fg = card.logoTextColor || '#FFFFFF';
+    const abbrevText = this.cardAbbreviation(card);
     const logoInner = card.logo
       ? `<img src="${card.logo}" alt="">`
-      : this.cardAbbreviation(card);
-    const abbrevLongClass = !card.logo && this.cardAbbreviation(card).length > 2 ? ' abbrev-long' : '';
-    const logoStyle = card.logo ? '' : `style="background:${bg};color:${fg};"`;
+      : this.escapeHtml(abbrevText);
+    const logoFontSize = card.logo ? '' : `font-size:${this.abbrevFontSize(abbrevText)};`;
+    const logoStyle = card.logo ? '' : `style="background:${bg};color:${fg};${logoFontSize}"`;
     const draftBadge = card.isDraft ? `<span class="draft-badge">${i18n.t('draft_label')}</span>` : '';
     const displayName = card.storeName && card.storeName.trim() ? this.escapeHtml(card.storeName) : `${i18n.t('draft_label')} ${this._draftDisplayIndex(card)}`;
     const checked = this.selectionMode && this.selectedCardIds.has(card.id);
     const checkboxHtml = this.selectionMode
       ? `<div class="card-row-checkbox${checked ? ' checked' : ''}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`
       : '';
+    const totalActivity = (card.useCount || 0) + (card.detailOpenCount || 0);
     row.innerHTML = `
       ${checkboxHtml}
-      <div class="card-logo${abbrevLongClass}" ${logoStyle}>${logoInner}</div>
+      <div class="card-logo" ${logoStyle}>${logoInner}</div>
       <div class="card-row-info">
         <div class="card-row-name">${displayName}${draftBadge}</div>
-        <div class="card-row-meta">${card.useCount || 0}x ${i18n.t('times_used_label')} · ${card.detailOpenCount || 0}x ${i18n.t('times_viewed_label')} · ${this.formatLastUsed(this.mostRecentActivity(card))}</div>
+        <div class="card-row-meta">${totalActivity}x ${i18n.t('combined_uses_label')} · ${this.formatLastUsed(this.mostRecentActivity(card))}</div>
       </div>
       <div class="card-row-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     `;
@@ -429,8 +456,19 @@ const App = {
     return max > 0 ? max : null;
   },
   cardAbbreviation(card) {
-    if (card.abbreviation && card.abbreviation.trim()) return card.abbreviation.trim().slice(0, 8).toUpperCase();
+    if (card.abbreviation && card.abbreviation.trim()) return card.abbreviation.trim().slice(0, 20).toUpperCase();
     return this.initialLetter(card.storeName);
+  },
+  // Proportionally shrinks the abbreviation's font size as it gets longer (more characters
+  // and/or more manually-entered line breaks), so longer text still fits inside the circle.
+  abbrevFontSize(text) {
+    const len = (text || '').replace(/\n/g, '').length;
+    const lines = (text || '').split('\n').length;
+    if (len <= 2 && lines <= 1) return '18px';
+    if (len <= 4 && lines <= 2) return '14px';
+    if (len <= 8) return '12px';
+    if (len <= 14) return '10px';
+    return '8.5px';
   },
   formatLastUsed(ts) {
     if (!ts) return i18n.t('never_used');
@@ -647,13 +685,13 @@ const App = {
     if (this.editingCard.logo) {
       el.style.background = '';
       el.style.color = '';
-      el.classList.remove('abbrev-long');
+      el.style.fontSize = '';
       el.innerHTML = `<img src="${this.editingCard.logo}" alt="">`;
     } else {
       el.style.background = this.editingCard.logoColor || '#1E3A5F';
       el.style.color = this.editingCard.logoTextColor || '#FFFFFF';
       const abbrev = this.cardAbbreviation(this.editingCard);
-      el.classList.toggle('abbrev-long', abbrev.length > 2);
+      el.style.fontSize = this.abbrevFontSize(abbrev);
       el.textContent = abbrev;
     }
   },
@@ -731,6 +769,11 @@ const App = {
     document.getElementById('scan-pane').hidden = which !== 'scan';
     document.getElementById('manual-pane').hidden = which !== 'manual';
     if (which === 'scan') {
+      // Starting a fresh scan session (as opposed to handleBulkQrChunk() restarting the
+      // camera mid-transfer) - clear any in-progress multi-part receive state.
+      this._bulkReceiveBuffer = null;
+      this._bulkReceiveTotal = null;
+      this.clearScanProgress();
       this.startScanning();
     } else {
       this.stopScanning();
@@ -764,10 +807,25 @@ const App = {
   },
 
   async handleScanResult(result) {
+    // Multi-part bulk transfer frame: accumulate and keep scanning for the rest, rather
+    // than treating this as a finished single result.
+    const bulkChunk = Backup.parseBulkQrFrame(result.value);
+    if (bulkChunk) {
+      await this.handleBulkQrChunk(bulkChunk);
+      return;
+    }
+    // Single-frame bulk transfer (small card list, fits in one QR).
+    const bulkList = Backup.decodeBulkFromQr(result.value);
+    if (bulkList) {
+      this.stopScanning();
+      await this.importSharedCards(bulkList);
+      return;
+    }
+    // Single shared card (older format / single-card share).
     const shared = Backup.decodeCardFromQr(result.value);
     if (shared) {
       this.stopScanning();
-      await this.importSharedCard(shared);
+      await this.importSharedCards([shared]);
       return;
     }
 
@@ -794,24 +852,60 @@ const App = {
     this.switchCapturePane('manual');
   },
 
-  // Handles a QR code produced by another Vernostka install's "Send card" feature: offers
-  // to add it as a brand-new local card instead of treating the scanned text as this card's
-  // own code.
-  async importSharedCard(shared) {
-    const proceed = await this.confirmDialog(
-      i18n.t('receive_card_title'),
-      i18n.t('receive_card_desc', { name: shared.n || '' }),
-      i18n.t('receive_card_add'),
-      i18n.t('cancel')
-    );
-    if (!proceed) { this.startScanning(); return; }
+  // Accumulates one part of a multi-frame bulk QR transfer. Keeps the camera running (rather
+  // than stopping after this single detection) until every part has been seen at least once,
+  // then reassembles the full payload and imports it.
+  async handleBulkQrChunk(chunkInfo) {
+    if (!this._bulkReceiveBuffer || this._bulkReceiveTotal !== chunkInfo.total) {
+      this._bulkReceiveBuffer = {};
+      this._bulkReceiveTotal = chunkInfo.total;
+    }
+    this._bulkReceiveBuffer[chunkInfo.index] = chunkInfo.chunk;
+    const receivedCount = Object.keys(this._bulkReceiveBuffer).length;
+    this.showScanProgress(i18n.t('scan_receiving_progress', { current: receivedCount, total: chunkInfo.total }));
 
+    if (receivedCount >= chunkInfo.total) {
+      const parts = [];
+      for (let i = 1; i <= chunkInfo.total; i++) parts.push(this._bulkReceiveBuffer[i] || '');
+      const payloadStr = parts.join('');
+      this._bulkReceiveBuffer = null;
+      this._bulkReceiveTotal = null;
+      this.stopScanning();
+      this.clearScanProgress();
+      let cards = null;
+      try { cards = JSON.parse(payloadStr); } catch (e) { cards = null; }
+      if (Array.isArray(cards) && cards.length) {
+        await this.importSharedCards(cards);
+      } else {
+        this.toast(i18n.t('photo_scan_failed'));
+        this.startScanning();
+      }
+      return;
+    }
+    if (navigator.vibrate) navigator.vibrate(30);
+    // Restart the camera loop to keep listening for the remaining parts.
+    this.startScanning();
+  },
+
+  showScanProgress(text) {
+    const el = document.getElementById('scan-progress-hint');
+    if (!el) return;
+    el.hidden = false;
+    el.textContent = text;
+  },
+
+  clearScanProgress() {
+    const el = document.getElementById('scan-progress-hint');
+    if (el) el.hidden = true;
+  },
+
+  // Builds and saves a local card from one shared/received compact card object.
+  async createCardFromShared(shared) {
     let categoryId = this.categories[0] ? this.categories[0].id : null;
     if (shared.cat) {
       const match = this.categories.find((c) => this.categoryLabel(c).toLowerCase() === String(shared.cat).toLowerCase());
       if (match) categoryId = match.id;
     }
-
     const newCard = {
       id: DB.uid(),
       storeName: (shared.n && shared.n.trim()) || i18n.t('untitled_card'),
@@ -833,9 +927,27 @@ const App = {
     };
     await DB.putCard(newCard);
     await DB.addHistory({ id: DB.uid(), cardId: newCard.id, type: 'created', timestamp: newCard.createdAt });
+    return newCard;
+  },
+
+  // Handles a QR code (or QR sequence) produced by another Vernostka install's "Send"
+  // feature: offers to add the received card(s) as brand-new local cards.
+  async importSharedCards(sharedList) {
+    const count = sharedList.length;
+    const proceed = await this.confirmDialog(
+      i18n.t('receive_card_title'),
+      count === 1 ? i18n.t('receive_card_desc', { name: sharedList[0].n || '' }) : i18n.t('receive_cards_desc', { count }),
+      i18n.t('receive_card_add'),
+      i18n.t('cancel')
+    );
+    if (!proceed) { this.startScanning(); return; }
+
+    for (const shared of sharedList) {
+      await this.createCardFromShared(shared);
+    }
     this.closeEditModal();
     await this.renderCardsList();
-    this.toast(i18n.t('receive_card_added'));
+    this.toast(count === 1 ? i18n.t('receive_card_added') : i18n.t('receive_cards_added', { count }));
     this.onDataChanged();
   },
 
@@ -1022,8 +1134,7 @@ const App = {
       renderCode(codeEl, card.code, card.codeType, codeOpts);
     }
     document.getElementById('detail-history-section').hidden = true;
-    document.getElementById('detail-uses').textContent = card.useCount || 0;
-    document.getElementById('detail-preview-opens').textContent = card.detailOpenCount || 0;
+    document.getElementById('detail-uses').textContent = (card.useCount || 0) + (card.detailOpenCount || 0);
     document.getElementById('detail-last-used').textContent = this.formatLastUsed(this.mostRecentActivity(card));
     const noteTitle = document.getElementById('detail-note-title');
     const noteEl = document.getElementById('detail-note');

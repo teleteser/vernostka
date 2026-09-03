@@ -166,11 +166,10 @@ p { margin: 0.35em 0; }
   color: #fff;
   background: var(--primary);
   overflow: hidden;
-  white-space: normal;
+  white-space: pre-line;
   word-break: break-word;
   padding: 2px;
 }
-.card-logo.abbrev-long { font-size: 12px; }
 .card-logo img { width: 100%; height: 100%; object-fit: cover; }
 .card-row-info { flex: 1; min-width: 0; }
 .card-row-name { font-weight: 700; font-size: 15.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -221,10 +220,19 @@ p { margin: 0.35em 0; }
 .confirm-warning-icon { text-align: center; margin-bottom: 6px; }
 .confirm-warning { color: var(--danger); font-weight: 700; font-size: 13.5px; }
 .modal-sheet.big { min-height: 76vh; display: flex; flex-direction: column; border-radius: 22px 22px 0 0; padding-top: 32px; }
-.modal-sheet.big #confirm-title { font-size: 21px; text-align: center; margin-bottom: 10px; }
-.modal-sheet.big #confirm-desc { text-align: center; font-size: 15px; line-height: 1.5; }
-.modal-sheet.big #confirm-warning { text-align: center; margin-top: 14px; }
-.modal-sheet.big .btn-row { margin-top: auto; }
+.modal-sheet.big #confirm-title { font-size: 24px; text-align: center; margin-bottom: 12px; }
+.modal-sheet.big #confirm-desc { text-align: center; font-size: 17px; line-height: 1.55; }
+.modal-sheet.big #confirm-warning {
+  text-align: center;
+  margin: 18px 0 0;
+  padding: 12px 16px;
+  background: rgba(211,66,62,0.12);
+  border: 1px solid rgba(211,66,62,0.35);
+  border-radius: 12px;
+  font-size: 15px;
+}
+.modal-sheet.big .btn-row { margin-top: auto; gap: 12px; }
+.modal-sheet.big .btn-row .btn { font-size: 18px; padding: 18px; font-weight: 800; }
 
 .empty-state { text-align: center; padding: 60px 32px 0; }
 .empty-illustration { margin-bottom: 18px; }
@@ -380,6 +388,7 @@ p { margin: 0.35em 0; }
 .camera-denied { text-align: center; padding: 18px 10px; }
 .scan-slow-hint { text-align: center; margin-top: 10px; }
 .scan-slow-hint button { margin-top: 6px; }
+.scan-progress-hint, .send-qr-progress { font-weight: 700; color: var(--accent); margin-top: 8px; }
 
 /* Codes must stay scannable regardless of app theme - always render on a white card,
    even in dark mode, otherwise a real barcode/QR scanner sees poor (dark-on-dark) contrast. */
@@ -387,6 +396,9 @@ p { margin: 0.35em 0; }
 .code-preview svg, .code-preview img { max-width: 100%; height: auto; }
 .code-preview .qr-holder { width: 100%; display: flex; align-items: center; justify-content: center; }
 .code-preview.code-square { aspect-ratio: 1 / 1; }
+/* A thin, wide barcode would otherwise render with very little height even at full width -
+   force a tall minimum so it's still comfortably scannable on-screen. */
+.code-preview.code-tall { height: 30vh; }
 .code-preview .hint { color: #555; }
 .code-preview.code-square .qr-holder,
 .code-preview.code-square .qr-holder canvas,
@@ -406,11 +418,11 @@ input[type="text"], input[type="search"], select, textarea {
   outline: none;
 }
 textarea { resize: vertical; }
+.abbreviation-textarea { resize: none; font-family: inherit; line-height: 1.3; min-height: 52px; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 
 .store-name-row { display: flex; gap: 10px; align-items: center; }
-.store-logo-preview { width: 46px; height: 46px; border-radius: 12px; background: var(--surface-2); flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; font-weight: 700; color: var(--primary); text-align: center; line-height: 1.05; white-space: normal; word-break: break-word; padding: 2px; }
-.store-logo-preview.abbrev-long { font-size: 12px; }
+.store-logo-preview { width: 46px; height: 46px; border-radius: 12px; background: var(--surface-2); flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; font-weight: 700; color: var(--primary); text-align: center; line-height: 1.05; white-space: pre-line; word-break: break-word; padding: 2px; }
 .store-logo-preview img { width: 100%; height: 100%; object-fit: cover; }
 
 .store-suggestions { display: flex; gap: 6px; overflow-x: auto; margin-top: 8px; }
@@ -462,7 +474,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 .code-card-btn { width: 100%; border: none; background: none; padding: 0; display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
 .tap-hint { font-size: 12.5px; color: var(--text-muted); font-weight: 600; }
 
-.detail-actions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 16px; }
+.detail-actions-row { display: flex; gap: 10px; margin: 0 0 16px; }
 .stat-pill { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 8px; text-align: center; }
 .stat-pill strong { display: block; font-size: 18px; color: var(--primary); }
 [data-theme="dark"] .stat-pill strong { color: #EAF0F6; }
@@ -523,6 +535,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 }
 .fs-code-container.dragging { cursor: grabbing; }
 .fs-code-container.code-square { aspect-ratio: 1 / 1; }
+/* Absolutely-positioned elements need an explicit height for a 100%-height child (the
+   stretched barcode svg) to resolve against - auto height wouldn't work here. */
+.fs-code-container.code-tall { height: 30vh; }
 .fs-code-container.code-square .qr-holder,
 .fs-code-container.code-square .qr-holder canvas,
 .fs-code-container.code-square .qr-holder img,

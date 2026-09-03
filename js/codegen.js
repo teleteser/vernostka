@@ -15,8 +15,11 @@ function guessCodeType(value) {
   return 'CODE128';
 }
 
-// Makes a rendered barcode <svg> scale fluidly to its container's width while preserving
-// aspect ratio, by converting its fixed pixel size into a viewBox.
+// Makes a rendered barcode <svg> scale fluidly to fill its container both horizontally and
+// vertically (rather than preserving its natural thin aspect ratio), by converting its fixed
+// pixel size into a viewBox and letting CSS stretch it. Barcodes are safe to stretch this way
+// since a scanner reads the pattern of bar widths along a horizontal line - taller bars don't
+// change what's encoded, they just make the code easier to scan on-screen.
 function makeSvgResponsive(svg) {
   let w = null;
   let h = null;
@@ -35,18 +38,21 @@ function makeSvgResponsive(svg) {
     svg.removeAttribute('width');
     svg.removeAttribute('height');
   }
+  svg.setAttribute('preserveAspectRatio', 'none');
   svg.style.width = '100%';
-  svg.style.height = 'auto';
+  svg.style.height = '100%';
   svg.style.display = 'block';
 }
 
 // Renders a code into the given container element, clearing it first.
 // type: one of CODE_TYPES. value: the raw code string.
-// options.responsive: if true, the code fluidly fills the container's width (and, for QR,
-// the container becomes a perfect square via CSS aspect-ratio - see .code-square in style.css).
+// options.responsive: if true, the code fluidly fills the container (and, for QR, the
+// container becomes a perfect square via CSS aspect-ratio - see .code-square in style.css;
+// for barcodes, the container gets a tall minimum height - see .code-tall in style.css).
+// options.correctLevel: QR error-correction level ('L'|'M'|'Q'|'H'), defaults to 'M'.
 function renderCode(container, value, type, options = {}) {
   container.innerHTML = '';
-  container.classList.remove('code-square');
+  container.classList.remove('code-square', 'code-tall');
   if (!value) return;
   const t = type || guessCodeType(value);
   try {
@@ -54,12 +60,13 @@ function renderCode(container, value, type, options = {}) {
       const holder = document.createElement('div');
       holder.className = 'qr-holder';
       container.appendChild(holder);
+      const level = (options.correctLevel || 'M').toUpperCase();
       // eslint-disable-next-line no-undef
       new QRCode(holder, {
         text: value,
         width: options.width || 300,
         height: options.height || 300,
-        correctLevel: QRCode.CorrectLevel.M
+        correctLevel: QRCode.CorrectLevel[level] || QRCode.CorrectLevel.M
       });
       if (options.responsive) container.classList.add('code-square');
     } else {
@@ -79,7 +86,10 @@ function renderCode(container, value, type, options = {}) {
         margin: 8,
         background: 'transparent'
       });
-      if (options.responsive) makeSvgResponsive(svg);
+      if (options.responsive) {
+        container.classList.add('code-tall');
+        makeSvgResponsive(svg);
+      }
     }
   } catch (err) {
     // Fallback: if format-specific rendering fails (e.g. invalid EAN checksum), use CODE128,
@@ -91,7 +101,10 @@ function renderCode(container, value, type, options = {}) {
       container.appendChild(svg);
       // eslint-disable-next-line no-undef
       JsBarcode(svg, value, { format: 'CODE128', height: options.height || 120, margin: 8, background: 'transparent' });
-      if (options.responsive) makeSvgResponsive(svg);
+      if (options.responsive) {
+        container.classList.add('code-tall');
+        makeSvgResponsive(svg);
+      }
     } catch (err2) {
       container.innerHTML = `<div class="code-render-error">${value}</div>`;
     }
