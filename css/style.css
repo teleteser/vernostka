@@ -552,6 +552,15 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 .fs-controls input[type=range] { flex: 1; }
 .fs-controls .btn.small { flex-shrink: 0; }
 
+.send-qr-controls {
+  flex-shrink: 0;
+  padding: 8px 20px calc(18px + var(--safe-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.send-qr-controls .btn-primary { padding: 16px; font-size: 16px; }
+
 .modal-overlay {
   position: fixed; inset: 0;
   background: rgba(10,15,20,0.5);

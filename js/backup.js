@@ -149,6 +149,20 @@ const Backup = {
     return this.filenameForNow().replace('vernostka-zaloha-', 'vernostka-karty-');
   },
 
+  // .txt + text/plain (rather than .json / application/json) for anything that goes through
+  // the Share sheet: many share targets - Apple Mail and lots of Android messaging/mail apps
+  // included - only declare support for a handful of common types, and "application/json"
+  // is often missing from that list even though "text/plain" is essentially always accepted.
+  // This is what lets a shared card/backup file actually show up as a normal, attachable
+  // file when the person picks Mail, Messages, WhatsApp, etc. - on either iPhone or Android.
+  shareFilenameForNow() {
+    return this.filenameForNow().replace(/\.json$/, '.txt');
+  },
+
+  shareTransferFilenameForNow() {
+    return this.transferFilenameForNow().replace(/\.json$/, '.txt');
+  },
+
   // ---- Android / Chrome: File System Access API ----
   async chooseFolder() {
     if (!this.supportsFS) return false;
@@ -242,29 +256,30 @@ const Backup = {
   // ---- Manual export (fallback for iOS Safari, or on-demand anywhere) ----
   async exportToFile() {
     const payload = await this.buildBackupPayload();
-    const filename = this.filenameForNow();
-    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+    const shareFilename = this.shareFilenameForNow();
+    const blob = new Blob([JSON.stringify(payload)], { type: 'text/plain' });
 
     if (navigator.share && navigator.canShare) {
       try {
-        const file = new File([blob], filename, { type: 'application/json' });
+        const file = new File([blob], shareFilename, { type: 'text/plain' });
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({ files: [file], title: 'Vernostka zaloha' });
           await DB.setSetting('lastBackupAt', Date.now());
-          return filename;
+          return shareFilename;
         }
       } catch (e) { /* fall through to download */ }
     }
+    const downloadFilename = this.filenameForNow();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename;
+    a.download = downloadFilename;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
     await DB.setSetting('lastBackupAt', Date.now());
-    return filename;
+    return downloadFilename;
   },
 
   // Shares just the chosen cards (not the full local backup) as a file. Uses the same
@@ -273,22 +288,23 @@ const Backup = {
   // for free without needing the raw (much less broadly supported) Web Bluetooth API.
   async shareTransferFile(cardIds) {
     const payload = await this.buildTransferPayload(cardIds);
-    const filename = this.transferFilenameForNow();
-    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+    const shareFilename = this.shareTransferFilenameForNow();
+    const blob = new Blob([JSON.stringify(payload)], { type: 'text/plain' });
 
     if (navigator.share && navigator.canShare) {
       try {
-        const file = new File([blob], filename, { type: 'application/json' });
+        const file = new File([blob], shareFilename, { type: 'text/plain' });
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({ files: [file], title: 'Vernostka karty' });
           return true;
         }
       } catch (e) { /* fall through to download */ }
     }
+    const downloadFilename = this.transferFilenameForNow();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename;
+    a.download = downloadFilename;
     document.body.appendChild(a);
     a.click();
     a.remove();

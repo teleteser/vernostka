@@ -1,6 +1,39 @@
 // Vernostka codegen - render barcodes/QR codes, guess code type from manual input
 const CODE_TYPES = ['QR', 'EAN13', 'EAN8', 'CODE128', 'CODE39', 'UPC'];
 
+// The bundled QRCode.js (davidshimjs/qrcode.js) has a long-standing bug: it doesn't correctly
+// handle multi-byte Unicode characters (accented letters like a Slovak "ť", "š", "č"...),
+// which can throw during generation or produce a broken code. The standard workaround is to
+// pre-convert the string into a "UTF-8 byte string" (each output character represents one
+// raw UTF-8 byte) before handing it to the library - this is what actually makes its
+// byte-mode QR encoding work correctly for any language, not just plain ASCII.
+function utf8ByteString(str) {
+  let out = '';
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    if (c <= 0x7f) {
+      out += str.charAt(i);
+    } else if (c <= 0x7ff) {
+      out += String.fromCharCode(0xc0 | (c >> 6));
+      out += String.fromCharCode(0x80 | (c & 0x3f));
+    } else if (c >= 0xd800 && c <= 0xdbff) {
+      // surrogate pair (emoji etc.) - combine into a single code point first
+      i++;
+      const c2 = str.charCodeAt(i);
+      const cp = 0x10000 + ((c - 0xd800) << 10) + (c2 - 0xdc00);
+      out += String.fromCharCode(0xf0 | (cp >> 18));
+      out += String.fromCharCode(0x80 | ((cp >> 12) & 0x3f));
+      out += String.fromCharCode(0x80 | ((cp >> 6) & 0x3f));
+      out += String.fromCharCode(0x80 | (cp & 0x3f));
+    } else {
+      out += String.fromCharCode(0xe0 | (c >> 12));
+      out += String.fromCharCode(0x80 | ((c >> 6) & 0x3f));
+      out += String.fromCharCode(0x80 | (c & 0x3f));
+    }
+  }
+  return out;
+}
+
 function guessCodeType(value) {
   const v = (value || '').trim();
   if (!v) return 'CODE128';
@@ -63,7 +96,7 @@ function renderCode(container, value, type, options = {}) {
       const level = (options.correctLevel || 'M').toUpperCase();
       // eslint-disable-next-line no-undef
       new QRCode(holder, {
-        text: value,
+        text: utf8ByteString(value),
         width: options.width || 300,
         height: options.height || 300,
         correctLevel: QRCode.CorrectLevel[level] || QRCode.CorrectLevel.M

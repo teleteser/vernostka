@@ -109,7 +109,7 @@
           <button id="export-backup-btn" class="btn btn-secondary" data-i18n="backup_export_manual">Exportovat zalohu</button>
         </div>
         <button id="import-backup-btn" class="btn btn-ghost" data-i18n="backup_import">Obnovit zo zalohy</button>
-        <input type="file" id="import-file-input" accept="application/json,.json" hidden>
+        <input type="file" id="import-file-input" accept="application/json,.json,.txt,text/plain" hidden>
       </div>
 
       <div class="settings-group">
@@ -343,9 +343,20 @@
     <div class="fs-code-stage">
       <div id="send-qr-container" class="send-qr-container"></div>
     </div>
-    <div class="fs-controls">
+    <div class="send-qr-controls">
       <p class="hint center" data-i18n="send_qr_hint">Druhy telefon nech otvori Skenovat.</p>
       <p id="send-qr-progress" class="hint center send-qr-progress" hidden></p>
+      <button id="send-qr-end-btn" class="btn btn-primary" data-i18n="send_end_transfer">Ukoncit prenos</button>
+      <button id="send-qr-history-btn" class="btn btn-ghost small" data-i18n="send_history_button">Historia prenosov</button>
+    </div>
+  </div>
+
+  <!-- ===================== TRANSFER HISTORY ===================== -->
+  <div id="modal-transfer-history" class="modal-overlay" hidden>
+    <div class="modal-sheet">
+      <h3 data-i18n="send_history_title">Historia prenosov</h3>
+      <div id="transfer-history-list" class="history-list"></div>
+      <button id="transfer-history-close-btn" class="btn btn-ghost" data-i18n="close">Zavriet</button>
     </div>
   </div>
 

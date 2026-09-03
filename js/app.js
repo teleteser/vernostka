@@ -204,10 +204,10 @@ const App = {
     document.getElementById('send-method-cancel-btn').addEventListener('click', () => this.hideModal('modal-send-method'));
     document.getElementById('send-via-file-btn').addEventListener('click', () => this.sendSelectedViaFile());
     document.getElementById('send-via-qr-btn').addEventListener('click', () => this.sendSelectedViaQr());
-    document.getElementById('send-qr-close-btn').addEventListener('click', () => {
-      document.getElementById('modal-send-qr').hidden = true;
-      clearInterval(this._bulkQrTimer);
-    });
+    document.getElementById('send-qr-close-btn').addEventListener('click', () => this.endSendQrTransfer());
+    document.getElementById('send-qr-end-btn').addEventListener('click', () => this.endSendQrTransfer());
+    document.getElementById('send-qr-history-btn').addEventListener('click', () => this.openTransferHistory());
+    document.getElementById('transfer-history-close-btn').addEventListener('click', () => this.hideModal('modal-transfer-history'));
   },
 
   selectionMode: false,
@@ -301,6 +301,8 @@ const App = {
     const cardList = await Backup.buildBulkCardList(ids);
     this._bulkQrFrames = Backup.buildBulkQrFrames(cardList);
     this._bulkQrIndex = 0;
+    this._sendQrStartedAt = Date.now();
+    this._sendQrCardNames = cardList.map((c) => c.n || i18n.t('untitled_card'));
     document.getElementById('modal-send-qr').hidden = false;
     void document.getElementById('modal-send-qr').offsetHeight;
     this.renderBulkQrFrame();
@@ -314,6 +316,43 @@ const App = {
       }, 1800);
     }
     this.toggleSelectionMode(false);
+  },
+
+  async endSendQrTransfer() {
+    clearInterval(this._bulkQrTimer);
+    document.getElementById('modal-send-qr').hidden = true;
+    if (this._sendQrStartedAt) {
+      const durationMs = Date.now() - this._sendQrStartedAt;
+      await DB.addTransferLog({
+        id: DB.uid(),
+        timestamp: this._sendQrStartedAt,
+        cardCount: (this._sendQrCardNames || []).length,
+        cardNames: this._sendQrCardNames || [],
+        durationMs
+      });
+      this._sendQrStartedAt = null;
+      this._sendQrCardNames = null;
+    }
+  },
+
+  async openTransferHistory() {
+    const logs = await DB.getAllTransferLogs();
+    logs.sort((a, b) => b.timestamp - a.timestamp);
+    const listEl = document.getElementById('transfer-history-list');
+    listEl.innerHTML = '';
+    if (logs.length === 0) {
+      listEl.innerHTML = `<p class="hint">${i18n.t('history_empty')}</p>`;
+    } else {
+      logs.slice(0, 30).forEach((log) => {
+        const row = document.createElement('div');
+        row.className = 'history-row';
+        const names = (log.cardNames || []).slice(0, 3).join(', ') + ((log.cardNames || []).length > 3 ? '...' : '');
+        const seconds = Math.round((log.durationMs || 0) / 1000);
+        row.innerHTML = `<span>${this.formatLastUsed(log.timestamp)}</span><span class="type">${log.cardCount || 0}x - ${seconds}s${names ? ' - ' + this.escapeHtml(names) : ''}</span>`;
+        listEl.appendChild(row);
+      });
+    }
+    this.showModal('modal-transfer-history');
   },
 
   renderBulkQrFrame() {
@@ -456,7 +495,7 @@ const App = {
     return max > 0 ? max : null;
   },
   cardAbbreviation(card) {
-    if (card.abbreviation && card.abbreviation.trim()) return card.abbreviation.trim().slice(0, 20).toUpperCase();
+    if (card.abbreviation && card.abbreviation.trim()) return card.abbreviation.trim().slice(0, 20);
     return this.initialLetter(card.storeName);
   },
   // Proportionally shrinks the abbreviation's font size as it gets longer (more characters
@@ -900,11 +939,27 @@ const App = {
   },
 
   // Builds and saves a local card from one shared/received compact card object.
-  async createCardFromShared(shared) {
-    let categoryId = this.categories[0] ? this.categories[0].id : null;
-    if (shared.cat) {
-      const match = this.categories.find((c) => this.categoryLabel(c).toLowerCase() === String(shared.cat).toLowerCase());
-      if (match) categoryId = match.id;
+  async createCardFromShared(shared, strategy, fixedCategoryId) {
+    let categoryId = null;
+    if (strategy === 'none') {
+      categoryId = null;
+    } else if (strategy === 'choose') {
+      categoryId = fixedCategoryId || null;
+    } else {
+      // 'keep' (default): try to find a local category with the same label as on the
+      // sending phone; if none exists yet, recreate it locally so nothing gets lost.
+      if (shared.cat) {
+        const match = this.categories.find((c) => this.categoryLabel(c).toLowerCase() === String(shared.cat).toLowerCase());
+        if (match) {
+          categoryId = match.id;
+        } else {
+          const nextOrder = this.categories.reduce((max, c) => Math.max(max, c.order || 0), -1) + 1;
+          const newCat = { id: DB.uid(), builtin: null, name: shared.cat, order: nextOrder };
+          await DB.putCategory(newCat);
+          await this.loadCategories();
+          categoryId = newCat.id;
+        }
+      }
     }
     const newCard = {
       id: DB.uid(),
@@ -942,13 +997,80 @@ const App = {
     );
     if (!proceed) { this.startScanning(); return; }
 
-    for (const shared of sharedList) {
-      await this.createCardFromShared(shared);
+    const strategy = await this.askImportCategoryStrategy();
+    let fixedCategoryId = null;
+    if (strategy === 'choose') {
+      fixedCategoryId = await this.pickCategoryDialog();
     }
+
+    for (const shared of sharedList) {
+      await this.createCardFromShared(shared, strategy, fixedCategoryId);
+    }
+    this.renderCategoryChips();
+    this.renderCategorySelect();
+    this.renderSettingsCategories();
     this.closeEditModal();
     await this.renderCardsList();
     this.toast(count === 1 ? i18n.t('receive_card_added') : i18n.t('receive_cards_added', { count }));
     this.onDataChanged();
+  },
+
+  // Asks how the imported cards' categories should be handled: keep the same categorization
+  // as on the sending phone (creating any missing category locally), put everything into one
+  // chosen category, or leave them uncategorized.
+  async askImportCategoryStrategy() {
+    const choice = await this.threeWayDialog(
+      i18n.t('import_category_strategy_title'),
+      i18n.t('import_category_strategy_desc'),
+      [
+        { label: i18n.t('import_category_keep'), value: 'keep', className: 'btn-secondary' },
+        { label: i18n.t('import_category_choose'), value: 'choose', className: 'btn-secondary' },
+        { label: i18n.t('import_category_none'), value: 'none', className: 'btn-ghost' }
+      ]
+    );
+    return choice || 'keep';
+  },
+
+  // Lets the person pick one existing category (or create a new one) - reuses the bulk
+  // category-assign sheet's chip list UI. Resolves with the chosen category id, or null if
+  // dismissed.
+  pickCategoryDialog() {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        this.hideModal('modal-bulk-category');
+        resolve(value);
+      };
+      document.getElementById('bulk-assign-desc').textContent = i18n.t('pick_category_desc');
+      const listEl = document.getElementById('bulk-category-list');
+      listEl.innerHTML = '';
+      this.categories.forEach((cat) => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'chip';
+        chip.textContent = this.categoryLabel(cat);
+        chip.addEventListener('click', () => finish(cat.id));
+        listEl.appendChild(chip);
+      });
+      const newChip = document.createElement('button');
+      newChip.type = 'button';
+      newChip.className = 'chip';
+      newChip.textContent = i18n.t('category_add_new');
+      newChip.addEventListener('click', async () => {
+        const name = prompt(i18n.t('category_new_placeholder'));
+        if (!name || !name.trim()) return;
+        const nextOrder = this.categories.reduce((max, c) => Math.max(max, c.order || 0), -1) + 1;
+        const newCat = { id: DB.uid(), builtin: null, name: name.trim(), order: nextOrder };
+        await DB.putCategory(newCat);
+        await this.loadCategories();
+        finish(newCat.id);
+      });
+      listEl.appendChild(newChip);
+      document.getElementById('bulk-category-cancel-btn').addEventListener('click', () => finish(null), { once: true });
+      this.showModal('modal-bulk-category');
+    });
   },
 
   closeEditModal() {

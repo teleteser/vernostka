@@ -1,6 +1,6 @@
 // Vernostka DB layer - IndexedDB wrapper
 const DB_NAME = 'vernostka-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let _dbPromise = null;
 
@@ -24,6 +24,9 @@ function openDB() {
       }
       if (!db.objectStoreNames.contains('settings')) {
         db.createObjectStore('settings', { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains('transfers')) {
+        db.createObjectStore('transfers', { keyPath: 'id' });
       }
     };
     req.onsuccess = (e) => resolve(e.target.result);
@@ -163,6 +166,17 @@ const DB = {
     store.clear();
     settings.forEach((s) => store.put(s));
     return new Promise((res, rej) => { t.oncomplete = () => res(); t.onerror = () => rej(t.error); });
+  },
+
+  // ---- Transfer log (record of QR "Send cards" sessions) ----
+  async addTransferLog(entry) {
+    const t = await tx(['transfers'], 'readwrite');
+    t.objectStore('transfers').put(entry);
+    return new Promise((res, rej) => { t.oncomplete = () => res(entry); t.onerror = () => rej(t.error); });
+  },
+  async getAllTransferLogs() {
+    const t = await tx(['transfers']);
+    return reqToPromise(t.objectStore('transfers').getAll());
   },
 
   async isEmpty() {

@@ -4,7 +4,7 @@
 // treat this as a new service worker, which re-runs install() (refreshing every cached
 // file) and activate() (deleting old cache versions). Forgetting to bump it can leave the
 // app running on a stale mix of old/new files after a deploy.
-const CACHE_VERSION = 'vernostka-v7';
+const CACHE_VERSION = 'vernostka-v8';
 
 const APP_SHELL = [
   './',
