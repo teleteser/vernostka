@@ -5,6 +5,35 @@ const Backup = {
   MAX_BACKUPS: 5,
   supportsFS: 'showDirectoryPicker' in window,
 
+  // ---- Single-card QR transfer ----
+  // A QR code can only reliably hold a small amount of data, so a card shared this way is
+  // reduced to its essential fields (no logo image, no locations/history/stats) and prefixed
+  // so the scanner can tell it apart from a normal loyalty-card code.
+  QR_CARD_PREFIX: 'VRNK1:',
+
+  encodeCardForQr(card, categoryLabel) {
+    const compact = {
+      n: card.storeName || '',
+      c: card.code || '',
+      t: card.codeType || 'CODE128',
+      cat: categoryLabel || '',
+      note: card.note || '',
+      ab: card.abbreviation || '',
+      lc: card.logoColor || '',
+      tc: card.logoTextColor || ''
+    };
+    return this.QR_CARD_PREFIX + JSON.stringify(compact);
+  },
+
+  decodeCardFromQr(text) {
+    if (!text || typeof text !== 'string' || !text.startsWith(this.QR_CARD_PREFIX)) return null;
+    try {
+      return JSON.parse(text.slice(this.QR_CARD_PREFIX.length));
+    } catch (e) {
+      return null;
+    }
+  },
+
   async buildBackupPayload() {
     const [cards, history, categories, settings] = await Promise.all([
       DB.getAllCards(), DB.getAllHistory(), DB.getAllCategories(), DB.getAllSettings()
@@ -17,10 +46,33 @@ const Backup = {
     };
   },
 
+  // A "transfer" payload is a subset backup - just the chosen cards plus whichever
+  // categories they reference (no history/settings) - meant for sharing between phones
+  // rather than a full local backup. It's still shaped like a normal backup file, so the
+  // existing "Restore from backup" import flow can open it with no extra code.
+  async buildTransferPayload(cardIds) {
+    const [allCards, allCategories] = await Promise.all([DB.getAllCards(), DB.getAllCategories()]);
+    const idSet = new Set(cardIds);
+    const cards = allCards.filter((c) => idSet.has(c.id));
+    const usedCategoryIds = new Set(cards.map((c) => c.categoryId).filter(Boolean));
+    const categories = allCategories.filter((c) => usedCategoryIds.has(c.id));
+    return {
+      appId: 'vernostka',
+      formatVersion: 1,
+      transfer: true,
+      createdAt: new Date().toISOString(),
+      cards, categories
+    };
+  },
+
   filenameForNow() {
     const d = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     return `vernostka-zaloha-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}.json`;
+  },
+
+  transferFilenameForNow() {
+    return this.filenameForNow().replace('vernostka-zaloha-', 'vernostka-karty-');
   },
 
   // ---- Android / Chrome: File System Access API ----
@@ -139,6 +191,35 @@ const Backup = {
     URL.revokeObjectURL(url);
     await DB.setSetting('lastBackupAt', Date.now());
     return filename;
+  },
+
+  // Shares just the chosen cards (not the full local backup) as a file. Uses the same
+  // native Web Share sheet as a normal backup export - on Android this is exactly where
+  // Bluetooth / Nearby Share / any messaging app shows up, so we get "send via Bluetooth"
+  // for free without needing the raw (much less broadly supported) Web Bluetooth API.
+  async shareTransferFile(cardIds) {
+    const payload = await this.buildTransferPayload(cardIds);
+    const filename = this.transferFilenameForNow();
+    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+
+    if (navigator.share && navigator.canShare) {
+      try {
+        const file = new File([blob], filename, { type: 'application/json' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: 'Vernostka karty' });
+          return true;
+        }
+      } catch (e) { /* fall through to download */ }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    return true;
   },
 
   async importFromFile(file) {

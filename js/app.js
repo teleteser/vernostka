@@ -197,8 +197,14 @@ const App = {
 
     document.getElementById('select-mode-btn').addEventListener('click', () => this.toggleSelectionMode());
     document.getElementById('selection-cancel-btn').addEventListener('click', () => this.toggleSelectionMode(false));
+    document.getElementById('selection-select-all-btn').addEventListener('click', () => this.selectAllVisible());
     document.getElementById('selection-assign-btn').addEventListener('click', () => this.openBulkCategoryAssign());
+    document.getElementById('selection-send-btn').addEventListener('click', () => this.openSendMethodDialog());
     document.getElementById('bulk-category-cancel-btn').addEventListener('click', () => this.hideModal('modal-bulk-category'));
+    document.getElementById('send-method-cancel-btn').addEventListener('click', () => this.hideModal('modal-send-method'));
+    document.getElementById('send-via-file-btn').addEventListener('click', () => this.sendSelectedViaFile());
+    document.getElementById('send-via-qr-btn').addEventListener('click', () => this.sendSelectedViaQr());
+    document.getElementById('send-qr-close-btn').addEventListener('click', () => { document.getElementById('modal-send-qr').hidden = true; });
   },
 
   selectionMode: false,
@@ -259,6 +265,48 @@ const App = {
     this.onDataChanged();
   },
 
+  selectAllVisible() {
+    const ids = this._lastFilteredCardIds || [];
+    const allSelected = ids.length > 0 && ids.every((id) => this.selectedCardIds.has(id));
+    if (allSelected) {
+      ids.forEach((id) => this.selectedCardIds.delete(id));
+    } else {
+      ids.forEach((id) => this.selectedCardIds.add(id));
+    }
+    this.updateSelectionBar();
+    this.renderCardsList();
+  },
+
+  openSendMethodDialog() {
+    if (this.selectedCardIds.size === 0) return;
+    const count = this.selectedCardIds.size;
+    document.getElementById('send-method-desc').textContent = i18n.t('send_choose_method_desc', { count });
+    document.getElementById('send-via-qr-btn').hidden = count !== 1;
+    this.showModal('modal-send-method');
+  },
+
+  async sendSelectedViaFile() {
+    const ids = Array.from(this.selectedCardIds);
+    this.hideModal('modal-send-method');
+    await Backup.shareTransferFile(ids);
+    this.toggleSelectionMode(false);
+  },
+
+  async sendSelectedViaQr() {
+    const ids = Array.from(this.selectedCardIds);
+    if (ids.length !== 1) return;
+    const card = await DB.getCard(ids[0]);
+    if (!card) return;
+    const cat = this.categories.find((c) => c.id === card.categoryId);
+    const qrText = Backup.encodeCardForQr(card, cat ? this.categoryLabel(cat) : '');
+    this.hideModal('modal-send-method');
+    document.getElementById('modal-send-qr').hidden = false;
+    void document.getElementById('modal-send-qr').offsetHeight;
+    const container = document.getElementById('send-qr-container');
+    renderCode(container, qrText, 'QR', { width: 400, height: 400 });
+    this.toggleSelectionMode(false);
+  },
+
   cycleSort() {
     const order = ['frequency', 'alpha', 'distance'];
     const idx = order.indexOf(this.currentSort);
@@ -298,6 +346,7 @@ const App = {
     });
 
     filtered = this.sortCards(filtered);
+    this._lastFilteredCardIds = filtered.map((c) => c.id);
 
     if (this.cards.length === 0) {
       listEl.innerHTML = '';
@@ -338,6 +387,7 @@ const App = {
     const logoInner = card.logo
       ? `<img src="${card.logo}" alt="">`
       : this.cardAbbreviation(card);
+    const abbrevLongClass = !card.logo && this.cardAbbreviation(card).length > 2 ? ' abbrev-long' : '';
     const logoStyle = card.logo ? '' : `style="background:${bg};color:${fg};"`;
     const draftBadge = card.isDraft ? `<span class="draft-badge">${i18n.t('draft_label')}</span>` : '';
     const displayName = card.storeName && card.storeName.trim() ? this.escapeHtml(card.storeName) : `${i18n.t('draft_label')} ${this._draftDisplayIndex(card)}`;
@@ -347,10 +397,10 @@ const App = {
       : '';
     row.innerHTML = `
       ${checkboxHtml}
-      <div class="card-logo" ${logoStyle}>${logoInner}</div>
+      <div class="card-logo${abbrevLongClass}" ${logoStyle}>${logoInner}</div>
       <div class="card-row-info">
         <div class="card-row-name">${displayName}${draftBadge}</div>
-        <div class="card-row-meta">${card.useCount || 0} ${i18n.t('uses_label')} · ${this.formatLastUsed(this.mostRecentActivity(card))}</div>
+        <div class="card-row-meta">${card.useCount || 0}x ${i18n.t('times_used_label')} · ${card.detailOpenCount || 0}x ${i18n.t('times_viewed_label')} · ${this.formatLastUsed(this.mostRecentActivity(card))}</div>
       </div>
       <div class="card-row-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     `;
@@ -379,7 +429,7 @@ const App = {
     return max > 0 ? max : null;
   },
   cardAbbreviation(card) {
-    if (card.abbreviation && card.abbreviation.trim()) return card.abbreviation.trim().slice(0, 3).toUpperCase();
+    if (card.abbreviation && card.abbreviation.trim()) return card.abbreviation.trim().slice(0, 8).toUpperCase();
     return this.initialLetter(card.storeName);
   },
   formatLastUsed(ts) {
@@ -463,7 +513,7 @@ const App = {
       const ok = await this.confirmDialog(
         i18n.t('delete_card_title'),
         i18n.t('delete_card_desc', { name: this.editingCard.storeName }),
-        i18n.t('delete'), i18n.t('cancel')
+        i18n.t('delete'), i18n.t('cancel'), true
       );
       if (!ok) return;
       await DB.deleteCard(this.editingCard.id);
@@ -475,7 +525,7 @@ const App = {
       this.onDataChanged();
     });
     document.getElementById('edit-clear-history-btn').addEventListener('click', async () => {
-      const ok = await this.confirmDialog(i18n.t('delete_history_title'), i18n.t('delete_history_desc'), i18n.t('confirm'), i18n.t('cancel'));
+      const ok = await this.confirmDialog(i18n.t('delete_history_title'), i18n.t('delete_history_desc'), i18n.t('confirm'), i18n.t('cancel'), true);
       if (!ok) return;
       await DB.clearHistoryForCard(this.editingCard.id);
       this.editingCard.useCount = 0;
@@ -597,11 +647,14 @@ const App = {
     if (this.editingCard.logo) {
       el.style.background = '';
       el.style.color = '';
+      el.classList.remove('abbrev-long');
       el.innerHTML = `<img src="${this.editingCard.logo}" alt="">`;
     } else {
       el.style.background = this.editingCard.logoColor || '#1E3A5F';
       el.style.color = this.editingCard.logoTextColor || '#FFFFFF';
-      el.textContent = this.cardAbbreviation(this.editingCard);
+      const abbrev = this.cardAbbreviation(this.editingCard);
+      el.classList.toggle('abbrev-long', abbrev.length > 2);
+      el.textContent = abbrev;
     }
   },
 
@@ -711,6 +764,13 @@ const App = {
   },
 
   async handleScanResult(result) {
+    const shared = Backup.decodeCardFromQr(result.value);
+    if (shared) {
+      this.stopScanning();
+      await this.importSharedCard(shared);
+      return;
+    }
+
     this.editingCard.code = result.value;
     this.editingCard.codeType = result.format;
     this.editingCard.codeTypeManuallySet = true;
@@ -732,6 +792,51 @@ const App = {
     if (navigator.vibrate) navigator.vibrate(60);
     this.scheduleDraftAutosave();
     this.switchCapturePane('manual');
+  },
+
+  // Handles a QR code produced by another Vernostka install's "Send card" feature: offers
+  // to add it as a brand-new local card instead of treating the scanned text as this card's
+  // own code.
+  async importSharedCard(shared) {
+    const proceed = await this.confirmDialog(
+      i18n.t('receive_card_title'),
+      i18n.t('receive_card_desc', { name: shared.n || '' }),
+      i18n.t('receive_card_add'),
+      i18n.t('cancel')
+    );
+    if (!proceed) { this.startScanning(); return; }
+
+    let categoryId = this.categories[0] ? this.categories[0].id : null;
+    if (shared.cat) {
+      const match = this.categories.find((c) => this.categoryLabel(c).toLowerCase() === String(shared.cat).toLowerCase());
+      if (match) categoryId = match.id;
+    }
+
+    const newCard = {
+      id: DB.uid(),
+      storeName: (shared.n && shared.n.trim()) || i18n.t('untitled_card'),
+      code: shared.c || '',
+      codeType: shared.t || guessCodeType(shared.c || ''),
+      categoryId,
+      note: shared.note || '',
+      logo: null,
+      logoColor: shared.lc || '#1E3A5F',
+      logoTextColor: shared.tc || '#FFFFFF',
+      abbreviation: shared.ab || '',
+      locations: [],
+      useCount: 0,
+      detailOpenCount: 0,
+      lastUsedAt: null,
+      lastDetailOpenAt: null,
+      createdAt: Date.now(),
+      isDraft: false
+    };
+    await DB.putCard(newCard);
+    await DB.addHistory({ id: DB.uid(), cardId: newCard.id, type: 'created', timestamp: newCard.createdAt });
+    this.closeEditModal();
+    await this.renderCardsList();
+    this.toast(i18n.t('receive_card_added'));
+    this.onDataChanged();
   },
 
   closeEditModal() {
@@ -1136,7 +1241,8 @@ const App = {
           { label: i18n.t('cancel'), value: 'cancel', className: 'btn-ghost' },
           { label: i18n.t('backup_then_delete'), value: 'backup', className: 'btn-secondary' },
           { label: i18n.t('delete_without_backup'), value: 'delete', className: 'btn-danger' }
-        ]
+        ],
+        true
       );
       if (!choice || choice === 'cancel') return;
       if (choice === 'backup') {
@@ -1215,7 +1321,8 @@ const App = {
               { label: i18n.t('cancel'), value: 'cancel', className: 'btn-ghost' },
               { label: i18n.t('category_delete_move'), value: 'move', className: 'btn-secondary' },
               { label: i18n.t('category_delete_remove_cards'), value: 'delete', className: 'btn-danger' }
-            ]
+            ],
+            true
           );
           if (!choice || choice === 'cancel') return;
           const allCards = await DB.getAllCards();
@@ -1351,10 +1458,13 @@ const App = {
     // handled dynamically via confirmDialog()
   },
 
-  confirmDialog(title, desc, okLabel, cancelLabel) {
+  confirmDialog(title, desc, okLabel, cancelLabel, danger = false) {
     return new Promise((resolve) => {
       document.getElementById('confirm-title').textContent = title;
       document.getElementById('confirm-desc').textContent = desc;
+      document.querySelector('#modal-confirm .modal-sheet').classList.toggle('big', danger);
+      document.getElementById('confirm-warning-icon').hidden = !danger;
+      document.getElementById('confirm-warning').hidden = !danger;
       const okBtn = document.getElementById('confirm-ok-btn');
       const cancelBtn = document.getElementById('confirm-cancel-btn');
       okBtn.textContent = okLabel;
@@ -1374,6 +1484,9 @@ const App = {
     return new Promise((resolve) => {
       document.getElementById('confirm-title').textContent = title;
       document.getElementById('confirm-desc').textContent = desc;
+      document.querySelector('#modal-confirm .modal-sheet').classList.remove('big');
+      document.getElementById('confirm-warning-icon').hidden = true;
+      document.getElementById('confirm-warning').hidden = true;
       const okBtn = document.getElementById('confirm-ok-btn');
       const cancelBtn = document.getElementById('confirm-cancel-btn');
       okBtn.textContent = choiceALabel;
@@ -1392,10 +1505,13 @@ const App = {
   // Generic 2-or-3-button sheet. buttons: [{label, value, className}]. Resolves with the
   // clicked button's value. Rebuilds the confirm sheet's default two buttons afterwards so
   // confirmDialog()/choiceDialog() keep working normally on subsequent calls.
-  threeWayDialog(title, desc, buttons) {
+  threeWayDialog(title, desc, buttons, danger = false) {
     return new Promise((resolve) => {
       document.getElementById('confirm-title').textContent = title;
       document.getElementById('confirm-desc').textContent = desc;
+      document.querySelector('#modal-confirm .modal-sheet').classList.toggle('big', danger);
+      document.getElementById('confirm-warning-icon').hidden = !danger;
+      document.getElementById('confirm-warning').hidden = !danger;
       const btnRow = document.querySelector('#modal-confirm .btn-row');
       btnRow.innerHTML = '';
       buttons.forEach((b) => {

@@ -161,10 +161,16 @@ p { margin: 0.35em 0; }
   display: flex; align-items: center; justify-content: center;
   font-weight: 700;
   font-size: 18px;
+  line-height: 1.05;
+  text-align: center;
   color: #fff;
   background: var(--primary);
   overflow: hidden;
+  white-space: normal;
+  word-break: break-word;
+  padding: 2px;
 }
+.card-logo.abbrev-long { font-size: 12px; }
 .card-logo img { width: 100%; height: 100%; object-fit: cover; }
 .card-row-info { flex: 1; min-width: 0; }
 .card-row-name { font-weight: 700; font-size: 15.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -195,15 +201,30 @@ p { margin: 0.35em 0; }
   border-radius: 14px;
   padding: 10px 14px;
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   z-index: 18;
   box-shadow: 0 8px 20px rgba(0,0,0,0.25);
 }
+.selection-bar-row { display: flex; align-items: center; gap: 10px; }
 .selection-bar #selection-count { font-weight: 700; font-size: 14px; }
-.selection-bar .btn { width: auto; }
+.selection-bar .btn { width: auto; flex: 1; }
 .selection-bar .btn-secondary { background: rgba(255,255,255,0.15); color: #fff; border: none; }
-.selection-bar .btn-ghost { color: rgba(255,255,255,0.85); margin-left: auto; }
+.selection-bar .btn-ghost { color: rgba(255,255,255,0.85); flex: 0 0 auto; }
+.selection-bar-row:first-child #selection-count { flex: 0 0 auto; }
+.selection-bar-row:first-child .btn-ghost:last-child { margin-left: auto; }
+
+.send-qr-container { width: min(95%, 460px); background: #fff; border-radius: 16px; padding: 16px; display: flex; align-items: center; justify-content: center; }
+.send-qr-container .qr-holder { width: 100%; }
+.send-qr-container canvas, .send-qr-container img { width: 100%; height: auto; }
+
+.confirm-warning-icon { text-align: center; margin-bottom: 6px; }
+.confirm-warning { color: var(--danger); font-weight: 700; font-size: 13.5px; }
+.modal-sheet.big { min-height: 76vh; display: flex; flex-direction: column; border-radius: 22px 22px 0 0; padding-top: 32px; }
+.modal-sheet.big #confirm-title { font-size: 21px; text-align: center; margin-bottom: 10px; }
+.modal-sheet.big #confirm-desc { text-align: center; font-size: 15px; line-height: 1.5; }
+.modal-sheet.big #confirm-warning { text-align: center; margin-top: 14px; }
+.modal-sheet.big .btn-row { margin-top: auto; }
 
 .empty-state { text-align: center; padding: 60px 32px 0; }
 .empty-illustration { margin-bottom: 18px; }
@@ -388,7 +409,8 @@ textarea { resize: vertical; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 
 .store-name-row { display: flex; gap: 10px; align-items: center; }
-.store-logo-preview { width: 46px; height: 46px; border-radius: 12px; background: var(--surface-2); flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; font-weight: 700; color: var(--primary); }
+.store-logo-preview { width: 46px; height: 46px; border-radius: 12px; background: var(--surface-2); flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; font-weight: 700; color: var(--primary); text-align: center; line-height: 1.05; white-space: normal; word-break: break-word; padding: 2px; }
+.store-logo-preview.abbrev-long { font-size: 12px; }
 .store-logo-preview img { width: 100%; height: 100%; object-fit: cover; }
 
 .store-suggestions { display: flex; gap: 6px; overflow-x: auto; margin-top: 8px; }
@@ -433,13 +455,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 .location-name-input { margin: 14px 20px 10px; width: calc(100% - 40px); }
 #map-container { width: 100%; height: 48vh; }
 
-.code-card-btn { width: 100%; border: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
-/* Large, near-edge-to-edge code display used in the card detail screen: bleeds past the
-   modal's normal side padding so the code visually spans ~95% of the screen width. Only
-   the inner .code-preview keeps a visible frame - the wrapping button is invisible so we
-   don't end up with two nested borders eating into the available width. */
-.detail-code-frame.code-card-btn { margin: 0 -20px 16px; padding: 0; background: none; border: none; }
-.detail-code-frame .code-preview { margin: 0; border-radius: 0; }
+/* The button itself carries no visual styling - the .code-preview inside it is the only
+   visible frame, exactly matching how the code preview looks when editing a card. (An
+   earlier "full-bleed" version of this button had its own border/background/padding on top
+   of .code-preview's own, producing a double frame and a slightly-short width.) */
+.code-card-btn { width: 100%; border: none; background: none; padding: 0; display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
 .tap-hint { font-size: 12.5px; color: var(--text-muted); font-weight: 600; }
 
 .detail-actions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 16px; }

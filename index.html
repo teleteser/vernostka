@@ -43,9 +43,15 @@
     <div id="cards-list" class="cards-list"></div>
 
     <div id="selection-bar" class="selection-bar" hidden>
-      <span id="selection-count">0</span>
-      <button id="selection-assign-btn" class="btn btn-secondary small" data-i18n="bulk_assign_button">Priradit kategoriu</button>
-      <button id="selection-cancel-btn" class="btn btn-ghost small" data-i18n="cancel">Zrusit</button>
+      <div class="selection-bar-row">
+        <span id="selection-count">0</span>
+        <button id="selection-select-all-btn" class="btn btn-ghost small" data-i18n="select_all_visible">Vybrat vsetky</button>
+        <button id="selection-cancel-btn" class="btn btn-ghost small" data-i18n="cancel">Zrusit</button>
+      </div>
+      <div class="selection-bar-row">
+        <button id="selection-assign-btn" class="btn btn-secondary small" data-i18n="bulk_assign_button">Priradit kategoriu</button>
+        <button id="selection-send-btn" class="btn btn-secondary small" data-i18n="send_button">Odoslat</button>
+      </div>
     </div>
 
     <div id="empty-state" class="empty-state" hidden>
@@ -193,7 +199,7 @@
         <div class="appearance-row">
           <div class="appearance-field">
             <label data-i18n="abbreviation_label">Skratka karty</label>
-            <input type="text" id="field-abbreviation" autocomplete="off" maxlength="3" data-i18n-placeholder="abbreviation_placeholder" placeholder="napr. LI">
+            <input type="text" id="field-abbreviation" autocomplete="off" maxlength="8" data-i18n-placeholder="abbreviation_placeholder" placeholder="napr. LIDL">
           </div>
           <div class="appearance-field">
             <label data-i18n="logo_color_label">Farba policka</label>
@@ -253,7 +259,7 @@
       </button>
     </header>
     <div class="modal-body">
-      <button id="show-code-btn" class="code-card-btn detail-code-frame">
+      <button id="show-code-btn" class="code-card-btn">
         <div id="detail-code-mini" class="code-preview"></div>
       </button>
 
@@ -297,12 +303,48 @@
   <!-- ===================== GENERIC CONFIRM DIALOG ===================== -->
   <div id="modal-confirm" class="modal-overlay" hidden>
     <div class="modal-sheet">
+      <div id="confirm-warning-icon" class="confirm-warning-icon" hidden>
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#D3423E" stroke-width="2"/><path d="M12 7v6" stroke="#D3423E" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="16.3" r="1.15" fill="#D3423E"/></svg>
+      </div>
       <h3 id="confirm-title">-</h3>
       <p id="confirm-desc">-</p>
+      <p id="confirm-warning" class="confirm-warning" hidden data-i18n="irreversible_warning">Tuto akciu nemozno vratit spat.</p>
       <div class="btn-row">
         <button id="confirm-cancel-btn" class="btn btn-ghost" data-i18n="cancel">Zrusit</button>
         <button id="confirm-ok-btn" class="btn btn-danger" data-i18n="confirm">Potvrdit</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ===================== SEND CARDS METHOD DIALOG ===================== -->
+  <div id="modal-send-method" class="modal-overlay" hidden>
+    <div class="modal-sheet">
+      <h3 data-i18n="send_title">Odoslat karty</h3>
+      <p id="send-method-desc"></p>
+      <div class="btn-row">
+        <button id="send-via-file-btn" class="btn btn-secondary" data-i18n="send_via_file">Zdielat subor</button>
+      </div>
+      <div class="btn-row">
+        <button id="send-via-qr-btn" class="btn btn-secondary" data-i18n="send_via_qr" hidden>Zobrazit ako QR kod</button>
+      </div>
+      <button id="send-method-cancel-btn" class="btn btn-ghost" data-i18n="cancel">Zrusit</button>
+    </div>
+  </div>
+
+  <!-- ===================== SEND QR DISPLAY ===================== -->
+  <div id="modal-send-qr" class="fullscreen-code" hidden>
+    <div class="fs-header">
+      <button id="send-qr-close-btn" class="fs-close-btn" aria-label="Close">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#111" stroke-width="2.4" stroke-linecap="round"/></svg>
+      </button>
+      <div class="fs-store-name" data-i18n="send_title">Odoslat karty</div>
+      <div class="fs-header-spacer"></div>
+    </div>
+    <div class="fs-code-stage">
+      <div id="send-qr-container" class="send-qr-container"></div>
+    </div>
+    <div class="fs-controls">
+      <p class="hint center" data-i18n="send_qr_hint">Druhy telefon nech otvori Skenovat.</p>
     </div>
   </div>
 
