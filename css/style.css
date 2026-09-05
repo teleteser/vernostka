@@ -710,18 +710,19 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   margin-bottom: 8px;
 }
 .send-qr-controls .transfer-progress-text { color: #111; }
+/* A grid with a fixed number of equal columns keeps every block square - a wrapping flex
+   row stretched the blocks of the first (full) row into rectangles. */
 .progress-segments {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  justify-content: center;
-  margin-bottom: 6px;
+  display: grid;
+  grid-template-columns: repeat(15, 1fr);
+  gap: 4px;
+  margin: 0 auto 6px;
+  max-width: 420px;
 }
 .progress-segment {
-  flex: 1 1 10px;
-  min-width: 8px;
-  max-width: 34px;
-  height: 14px;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-height: 22px;
   border-radius: 3px;
   background: rgba(120,130,140,0.28);
   border: 1px solid rgba(120,130,140,0.35);
@@ -740,3 +741,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 .install-steps { border-top: 1px solid var(--border); padding-top: 14px; }
 .install-steps h4 { font-size: 15.5px; font-weight: 800; margin: 12px 0 4px; }
 .install-steps p { font-size: 15px; line-height: 1.5; color: var(--text-muted); }
+
+/* Sending screen: the frame counter sits above the code so it is always visible */
+.send-qr-progress-wrap { flex-shrink: 0; padding: 6px 16px 2px; background: #fff; }
+.send-qr-progress-wrap .transfer-progress-text { color: #111; margin-bottom: 6px; }

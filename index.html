@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Vernostka - verzia v19 -->
+<!-- Vernostka - verzia v20 -->
 <html lang="sk">
 <head>
 <meta charset="UTF-8">
@@ -91,6 +91,15 @@
           <button data-value="dark" data-i18n="theme_dark">Tmavy</button>
           <button data-value="system" data-i18n="theme_system">Podla systemu</button>
         </div>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="settings_gps">Poloha (GPS)</h3>
+        <div class="segmented" id="gps-segmented">
+          <button data-value="on" data-i18n="gps_on">Zapnuta</button>
+          <button data-value="off" data-i18n="gps_off">Vypnuta</button>
+        </div>
+        <p class="hint" data-i18n="gps_hint">Ked je vypnuta, appka nezistuje polohu a nezerie baterku. Je potrebna len na radenie kariet podla vzdialenosti pobocky.</p>
       </div>
 
       <div class="settings-group">
@@ -282,7 +291,7 @@
       </button>
 
       <div class="detail-actions-row">
-        <div class="stat-pill"><strong id="detail-uses">0</strong><span data-i18n="combined_uses_label">pouzite/pozrete</span></div>
+        <div class="stat-pill"><span data-i18n="combined_uses_label">Zobrazene</span><strong id="detail-uses">0 x</strong></div>
         <div class="stat-pill"><span data-i18n="last_used">Naposledy</span><strong id="detail-last-used">-</strong></div>
         <button id="toggle-history-btn" class="stat-pill pill-button" data-i18n="history_title">Historia</button>
       </div>
@@ -357,15 +366,15 @@
       <div class="fs-store-name" data-i18n="send_title">Odoslat karty</div>
       <div class="fs-header-spacer"></div>
     </div>
+    <div id="send-qr-progress-wrap" class="send-qr-progress-wrap" hidden>
+      <p id="send-qr-progress" class="transfer-progress-text"></p>
+      <div id="send-qr-bar" class="progress-segments"></div>
+    </div>
     <div class="fs-code-stage">
       <div id="send-qr-container" class="send-qr-container"></div>
     </div>
     <div class="send-qr-controls">
       <p class="hint center" data-i18n="send_qr_hint">Druhy telefon nech otvori Skenovat.</p>
-      <div id="send-qr-progress-wrap" hidden>
-        <p id="send-qr-progress" class="transfer-progress-text"></p>
-        <div id="send-qr-bar" class="progress-segments"></div>
-      </div>
       <div id="send-qr-nav" class="send-qr-nav" hidden>
         <button id="send-qr-prev-btn" class="btn btn-secondary small" aria-label="Predchadzajuci">&#9664;</button>
         <button id="send-qr-play-btn" class="btn btn-secondary small" data-i18n="send_qr_pause">Pozastavit</button>

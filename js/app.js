@@ -1,4 +1,14 @@
-// Vernostka main app controller - verzia v19
+// Vernostka main app controller - verzia v20
+
+// Chrome fires beforeinstallprompt very early - often before the app has finished starting
+// up - and only once. Catch it here, at script level, so the "Install now" button in the
+// install sheet is really available on Android.
+let deferredInstallEvent = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallEvent = e;
+  window.dispatchEvent(new CustomEvent('vernostka-install-available'));
+});
 const App = {
   cards: [],
   categories: [],
@@ -38,14 +48,17 @@ const App = {
     this._confirmBtnRowTemplate = document.querySelector('#modal-confirm .btn-row').innerHTML;
 
     this.applyVibrationToDom();
+    this.applyGpsToDom();
     this.renderCategoryChips();
     this.renderCategorySelect();
     this.renderSettingsCategories();
     this.renderCardsList();
     this.updateBackupStatusUI();
 
-    this.userPos = await Geo.getCurrentPosition().catch(() => null);
-    if (this.currentSort === 'distance') this.renderCardsList();
+    if (this.gpsEnabled) {
+      this.userPos = await Geo.getCurrentPosition().catch(() => null);
+      if (this.currentSort === 'distance') this.renderCardsList();
+    }
 
     this.registerServiceWorker();
     await this.tryRestoreFolderAndCheckBackup();
@@ -84,6 +97,9 @@ const App = {
     this.theme = await DB.getSetting('theme', 'system');
     this.currentSort = await DB.getSetting('sortMode', 'frequency');
     this.vibrationEnabled = await DB.getSetting('vibration', true);
+    // Off by default: locating the phone costs battery and is only needed for sorting by
+    // distance, so it stays off until the person turns it on.
+    this.gpsEnabled = await DB.getSetting('gps', false);
   },
 
   applyTheme() {
@@ -93,6 +109,12 @@ const App = {
     }
     document.documentElement.setAttribute('data-theme', effective);
     document.querySelectorAll('#theme-segmented button').forEach((b) => b.classList.toggle('active', b.dataset.value === this.theme));
+  },
+
+  applyGpsToDom() {
+    document.querySelectorAll('#gps-segmented button').forEach((b) => {
+      b.classList.toggle('active', (b.dataset.value === 'on') === !!this.gpsEnabled);
+    });
   },
 
   applyVibrationToDom() {
@@ -108,6 +130,7 @@ const App = {
     document.title = i18n.t('appName');
     document.querySelectorAll('#lang-segmented button').forEach((b) => b.classList.toggle('active', b.dataset.value === this.lang));
     this.applyVibrationToDom();
+    this.applyGpsToDom();
     const qrPlayBtn = document.getElementById('send-qr-play-btn');
     if (qrPlayBtn) qrPlayBtn.textContent = i18n.t(this._bulkQrPlaying ? 'send_qr_pause' : 'send_qr_play');
     this.renderCategoryChips();
@@ -120,14 +143,22 @@ const App = {
     // Built-in categories always use a fixed, deterministic id (not a random one) so that
     // re-seeding (or merging in a backup that also contains its own copy of the defaults)
     // can never create duplicates - putCategory() with the same id just overwrites in place.
+    // Seed them once only. Re-creating any missing built-in category on every start meant a
+    // category the person deleted came back on the next launch.
+    const alreadySeeded = await DB.getSetting('defaultCategoriesSeeded', false);
     const existing = await DB.getAllCategories();
-    const existingBuiltinKeys = new Set(existing.filter((c) => c.builtin).map((c) => c.builtin));
-    let order = existing.reduce((max, c) => Math.max(max, c.order || 0), -1) + 1;
-    for (const key of DEFAULT_CATEGORIES) {
-      if (!existingBuiltinKeys.has(key)) {
-        await DB.putCategory({ id: 'default-' + key, builtin: key, name: null, order: order++ });
-      }
+    if (alreadySeeded) return;
+    if (existing.length > 0) {
+      // Existing install (or a restored backup): keep whatever is there, just remember that
+      // the defaults must not be re-created from now on.
+      await DB.setSetting('defaultCategoriesSeeded', true);
+      return;
     }
+    let order = 0;
+    for (const key of DEFAULT_CATEGORIES) {
+      await DB.putCategory({ id: 'default-' + key, builtin: key, name: null, order: order++ });
+    }
+    await DB.setSetting('defaultCategoriesSeeded', true);
   },
 
   // One-time cleanup for data that already ended up with duplicate categories (e.g. from
@@ -511,7 +542,11 @@ const App = {
     // Draw the code as large as the screen allows (the frames are short, so the squares stay
     // big) and with medium error correction, so a slightly blurred or angled shot still
     // decodes instead of forcing the other phone to hunt for the right angle.
-    const size = Math.max(280, Math.min(Math.floor(Math.min(window.innerWidth, window.innerHeight) - 24), 620));
+    // Fit the code to whatever room the stage actually has, so the progress line and the
+    // buttons below it never get pushed off the screen.
+    const stage = document.querySelector('#modal-send-qr .fs-code-stage');
+    const stageH = stage && stage.clientHeight ? stage.clientHeight - 16 : window.innerHeight * 0.5;
+    const size = Math.max(240, Math.min(Math.floor(Math.min(window.innerWidth - 16, stageH)), 620));
     renderCode(container, frame, 'QR', { width: size, height: size, correctLevel: 'M' });
     const wrap = document.getElementById('send-qr-progress-wrap');
     const progressEl = document.getElementById('send-qr-progress');
@@ -529,7 +564,7 @@ const App = {
   },
 
   cycleSort() {
-    const order = ['frequency', 'alpha', 'distance'];
+    const order = this.gpsEnabled ? ['frequency', 'alpha', 'distance'] : ['frequency', 'alpha'];
     const idx = order.indexOf(this.currentSort);
     this.currentSort = order[(idx + 1) % order.length];
     DB.setSetting('sortMode', this.currentSort);
@@ -591,8 +626,10 @@ const App = {
         const d1 = this.userPos ? Geo.nearestLocation(this.userPos, c1.locations || []) : Infinity;
         const d2 = this.userPos ? Geo.nearestLocation(this.userPos, c2.locations || []) : Infinity;
         cmp = d1 - d2;
-      } else { // frequency
-        cmp = (c2.useCount || 0) - (c1.useCount || 0);
+      } else { // frequency - same number the card row shows (opened + code shown)
+        cmp = this.cardActivityCount(c2) - this.cardActivityCount(c1);
+        // Same count: the more recently used card comes first.
+        if (cmp === 0) cmp = (this.mostRecentActivity(c2) || 0) - (this.mostRecentActivity(c1) || 0);
       }
       if (cmp === 0) cmp = (c2.createdAt || 0) - (c1.createdAt || 0);
       return cmp;
@@ -617,13 +654,13 @@ const App = {
     const checkboxHtml = this.selectionMode
       ? `<div class="card-row-checkbox${checked ? ' checked' : ''}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`
       : '';
-    const totalActivity = (card.useCount || 0) + (card.detailOpenCount || 0);
+    const totalActivity = this.cardActivityCount(card);
     row.innerHTML = `
       ${checkboxHtml}
       <div class="card-logo" ${logoStyle}>${logoInner}</div>
       <div class="card-row-info">
         <div class="card-row-name">${displayName}${draftBadge}</div>
-        <div class="card-row-meta">${totalActivity}x ${i18n.t('combined_uses_label')} · ${this.formatLastUsed(this.mostRecentActivity(card))}</div>
+        <div class="card-row-meta">${totalActivity}x ${i18n.t('shown_label_row')} · ${this.formatLastUsed(this.mostRecentActivity(card))}</div>
       </div>
       <div class="card-row-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     `;
@@ -704,6 +741,8 @@ const App = {
     const idx = unnamed.findIndex((c) => c.id === card.id);
     return idx >= 0 ? idx + 1 : 1;
   },
+
+  cardActivityCount(card) { return (card.useCount || 0) + (card.detailOpenCount || 0); },
 
   initialLetter(name) { return (name || '?').trim().charAt(0).toUpperCase(); },
   mostRecentActivity(card) {
@@ -1218,6 +1257,10 @@ const App = {
   // Draws one small block per QR code of the transfer: filled = already received.
   renderProgressSegments(el, total, isDone) {
     if (!el) return;
+    // At most 15 blocks per row, and every row uses the same number of columns, so the
+    // blocks stay square instead of being stretched into rectangles on the first row.
+    const perRow = Math.min(total, 15);
+    el.style.gridTemplateColumns = `repeat(${perRow}, 1fr)`;
     el.innerHTML = '';
     for (let i = 1; i <= total; i++) {
       const seg = document.createElement('span');
@@ -1512,7 +1555,12 @@ const App = {
 
   // ---------------- Card detail ----------------
   bindDetailModal() {
-    document.getElementById('detail-close-btn').addEventListener('click', () => this.hideModal('modal-detail'));
+    document.getElementById('detail-close-btn').addEventListener('click', async () => {
+      this.hideModal('modal-detail');
+      // The card was just viewed - its counter and position in the "most used" order have
+      // changed, so redraw the list instead of leaving a stale row behind.
+      await this.renderCardsList();
+    });
     document.getElementById('detail-edit-btn').addEventListener('click', () => {
       this.hideModal('modal-detail');
       this.openEditCard(this._detailCard);
@@ -1529,6 +1577,9 @@ const App = {
 
   async openCardDetail(card) {
     this._detailCard = card;
+    // Remember when the card was seen BEFORE this opening - that is what "Last" should
+    // show; otherwise it would always display the current time.
+    this._detailPreviousActivity = this.mostRecentActivity(card);
     // record "detail open" interaction
     card.detailOpenCount = (card.detailOpenCount || 0) + 1;
     card.lastDetailOpenAt = Date.now();
@@ -1556,8 +1607,10 @@ const App = {
       renderCode(codeEl, card.code, card.codeType, codeOpts);
     }
     document.getElementById('detail-history-section').hidden = true;
-    document.getElementById('detail-uses').textContent = (card.useCount || 0) + (card.detailOpenCount || 0);
-    document.getElementById('detail-last-used').textContent = this.formatLastUsed(this.mostRecentActivity(card));
+    document.getElementById('detail-uses').textContent = this.cardActivityCount(card) + ' x';
+    document.getElementById('detail-last-used').textContent = this._detailPreviousActivity
+      ? this.formatLastUsed(this._detailPreviousActivity)
+      : i18n.t('never_used');
     const noteTitle = document.getElementById('detail-note-title');
     const noteEl = document.getElementById('detail-note');
     if (card.note) { noteTitle.hidden = false; noteEl.textContent = card.note; }
@@ -1717,6 +1770,24 @@ const App = {
         this.applyTheme();
       });
     });
+    document.querySelectorAll('#gps-segmented button').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        this.gpsEnabled = btn.dataset.value === 'on';
+        await DB.setSetting('gps', this.gpsEnabled);
+        this.applyGpsToDom();
+        if (this.gpsEnabled) {
+          this.userPos = await Geo.getCurrentPosition().catch(() => null);
+        } else {
+          this.userPos = null;
+          if (this.currentSort === 'distance') {
+            this.currentSort = 'frequency';
+            await DB.setSetting('sortMode', this.currentSort);
+          }
+        }
+        await this.renderCardsList();
+      });
+    });
+
     document.querySelectorAll('#vibration-segmented button').forEach((btn) => {
       btn.addEventListener('click', async () => {
         this.vibrationEnabled = btn.dataset.value === 'on';
@@ -2080,26 +2151,24 @@ const App = {
   openInstallSheet() {
     // Chrome/Android hands us the install event - then the sheet can open the real install
     // dialog directly instead of describing where to find it in the browser menu.
-    document.getElementById('install-now-btn').hidden = !this._installEvent;
+    document.getElementById('install-now-btn').hidden = !deferredInstallEvent;
     this.showModal('modal-install');
   },
 
   bindInstallSheet() {
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      this._installEvent = e;
+    window.addEventListener('vernostka-install-available', () => {
       const btn = document.getElementById('install-now-btn');
-      if (btn && !document.getElementById('modal-install').hidden) btn.hidden = false;
+      if (btn) btn.hidden = false;
     });
     window.addEventListener('appinstalled', () => {
-      this._installEvent = null;
+      deferredInstallEvent = null;
       this.hideModal('modal-install');
       DB.setSetting('installPromptDismissed', true);
     });
     document.getElementById('install-now-btn').addEventListener('click', async () => {
-      if (!this._installEvent) return;
-      const evt = this._installEvent;
-      this._installEvent = null;
+      if (!deferredInstallEvent) return;
+      const evt = deferredInstallEvent;
+      deferredInstallEvent = null;
       this.hideModal('modal-install');
       try {
         evt.prompt();
