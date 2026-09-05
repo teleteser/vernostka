@@ -213,9 +213,9 @@ p { margin: 0.35em 0; }
 .selection-bar-row:first-child #selection-count { flex: 0 0 auto; }
 .selection-bar-row:first-child .btn-ghost:last-child { margin-left: auto; }
 
-.send-qr-container { width: min(95%, 460px); background: #fff; border-radius: 16px; padding: 16px; display: flex; align-items: center; justify-content: center; }
+.send-qr-container { width: min(100%, 620px); background: #fff; border-radius: 12px; padding: 8px; display: flex; align-items: center; justify-content: center; }
 .send-qr-container .qr-holder { width: 100%; }
-.send-qr-container canvas, .send-qr-container img { width: 100%; height: auto; }
+.send-qr-container canvas, .send-qr-container img { width: 100%; height: auto; image-rendering: pixelated; }
 
 .confirm-warning-icon { text-align: center; margin-bottom: 6px; }
 .confirm-warning { color: var(--danger); font-weight: 700; font-size: 13.5px; }
@@ -573,7 +573,10 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 .modal-overlay {
   position: fixed; inset: 0;
   background: rgba(10,15,20,0.5);
-  z-index: 80;
+  /* Above .fullscreen-code (z-index 100), otherwise a sheet opened from the fullscreen QR
+     screen (e.g. transfer history) would be rendered behind it and look like nothing
+     happened. */
+  z-index: 110;
   display: flex; align-items: flex-end; justify-content: center;
 }
 .modal-sheet {

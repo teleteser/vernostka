@@ -1,4 +1,4 @@
-// Vernostka main app controller - verzia v17
+// Vernostka main app controller - verzia v18
 const App = {
   cards: [],
   categories: [],
@@ -507,9 +507,11 @@ const App = {
     const frame = this._bulkQrFrames[this._bulkQrIndex];
     if (!frame) return;
     const container = document.getElementById('send-qr-container');
-    // Bulk frames can contain long strings of arbitrary characters - use the lowest QR error
-    // correction level to maximize how much fits in one scannable code.
-    renderCode(container, frame, 'QR', { width: 400, height: 400, correctLevel: 'L' });
+    // Draw the code as large as the screen allows (the frames are short, so the squares stay
+    // big) and with medium error correction, so a slightly blurred or angled shot still
+    // decodes instead of forcing the other phone to hunt for the right angle.
+    const size = Math.max(280, Math.min(Math.floor(Math.min(window.innerWidth, window.innerHeight) - 24), 620));
+    renderCode(container, frame, 'QR', { width: size, height: size, correctLevel: 'M' });
     const progressEl = document.getElementById('send-qr-progress');
     if (this._bulkQrFrames.length > 1) {
       progressEl.hidden = false;
@@ -1095,6 +1097,13 @@ const App = {
       await this.handleBulkQrChunk(bulkChunk);
       return;
     }
+    // While a multi-part transfer is running, anything that is not one of its frames is
+    // noise - most often a misread of the QR pattern as a 1D barcode. Accepting such a value
+    // would silently turn it into a card code and break the transfer, so it is ignored.
+    if (this._bulkReceiveTotal) {
+      this.showScanProgress(i18n.t('scan_receiving_ignored'));
+      return;
+    }
     // Single-frame bulk transfer (small card list, fits in one QR).
     const bulkList = Backup.decodeBulkFromQr(result.value);
     if (bulkList) {
@@ -1146,7 +1155,12 @@ const App = {
     }
     this._bulkReceiveBuffer[chunkInfo.index] = chunkInfo.chunk;
     const receivedCount = Object.keys(this._bulkReceiveBuffer).length;
-    this.showScanProgress(i18n.t('scan_receiving_progress', { current: receivedCount, total: chunkInfo.total }));
+    let progress = i18n.t('scan_receiving_progress', { current: receivedCount, total: chunkInfo.total });
+    // Naming the parts still missing lets the sender step to exactly those by hand.
+    const missing = [];
+    for (let i = 1; i <= chunkInfo.total; i++) if (!this._bulkReceiveBuffer[i]) missing.push(i);
+    if (missing.length && missing.length <= 8) progress += ' - ' + i18n.t('scan_receiving_missing', { list: missing.join(', ') });
+    this.showScanProgress(progress);
 
     if (receivedCount >= chunkInfo.total) {
       const parts = [];

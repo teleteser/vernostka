@@ -42,7 +42,9 @@ const Backup = {
   // single QR is used - no cycling needed.
   BULK_SINGLE_PREFIX: 'VRNKB1:',
   BULK_MULTI_PREFIX: 'VRNKM1:',
-  BULK_CHUNK_SIZE: 500,
+  // Fewer characters per frame means a lower-density QR code (bigger squares), which phone
+  // cameras read far more easily - at the cost of more frames in the sequence.
+  BULK_CHUNK_SIZE: 220,
 
   async buildBulkCardList(cardIds) {
     const [allCards, allCategories] = await Promise.all([DB.getAllCards(), DB.getAllCategories()]);
