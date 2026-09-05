@@ -62,11 +62,25 @@ class Scanner {
     this.zxingReader = null;
     this.zxingControls = null;
     this.currentFacing = 'environment';
+    // In continuous mode the camera keeps running after a code is read, so a multi-part QR
+    // transfer can collect frame after frame without restarting (and re-focusing) the
+    // camera between them. The same code seen again is only reported once per second.
+    this.continuous = false;
+    this._lastValue = null;
+    this._lastValueAt = 0;
   }
 
   static get hasNative() { return 'BarcodeDetector' in window; }
   static get hasZXing() { return typeof ZXing !== 'undefined' && !!ZXing.BrowserMultiFormatReader; }
   static get available() { return Scanner.hasNative || Scanner.hasZXing; }
+
+  _shouldReport(value) {
+    const now = Date.now();
+    if (value === this._lastValue && now - this._lastValueAt < 1000) return false;
+    this._lastValue = value;
+    this._lastValueAt = now;
+    return true;
+  }
 
   async start(onResult, onError, facingMode = 'environment') {
     this.currentFacing = facingMode;
@@ -115,8 +129,12 @@ class Scanner {
         if (result) {
           const value = result.getText();
           const format = mapZXingFormat(result.getBarcodeFormat());
-          this.stop();
-          onResult({ value, format });
+          if (this.continuous) {
+            if (this._shouldReport(value)) onResult({ value, format });
+          } else {
+            this.stop();
+            onResult({ value, format });
+          }
         }
         // err fires ~every frame with a "not found yet" exception - that's expected, ignore it.
       });
@@ -133,9 +151,13 @@ class Scanner {
       const codes = await this.nativeDetector.detect(this.video);
       if (codes && codes.length > 0) {
         const code = codes[0];
-        this.stop();
-        onResult({ value: code.rawValue, format: mapNativeFormat(code.format) });
-        return;
+        if (this.continuous) {
+          if (this._shouldReport(code.rawValue)) onResult({ value: code.rawValue, format: mapNativeFormat(code.format) });
+        } else {
+          this.stop();
+          onResult({ value: code.rawValue, format: mapNativeFormat(code.format) });
+          return;
+        }
       }
     } catch (e) {
       // Transient per-frame errors (e.g. video not ready yet) are normal - keep looping.

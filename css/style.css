@@ -615,16 +615,16 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 .card-row.long-pressing { transform: scale(0.975); border-color: var(--accent); transition: transform 120ms ease; }
 .longpress-ring {
   position: fixed;
-  width: 62px; height: 62px;
-  margin-left: -31px; margin-top: -31px;
+  width: 124px; height: 124px;
+  margin-left: -62px; margin-top: -62px;
   pointer-events: none;
   z-index: 60;
 }
 .longpress-ring svg { width: 100%; height: 100%; overflow: visible; }
 .longpress-ring circle {
-  fill: rgba(255, 122, 69, 0.12);
+  fill: rgba(255, 122, 69, 0.10);
   stroke: var(--accent);
-  stroke-width: 3.5;
+  stroke-width: 4.5;
   stroke-linecap: round;
   stroke-dasharray: 106.8;
   stroke-dashoffset: 106.8;
@@ -660,3 +660,39 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   filter: grayscale(1);
   pointer-events: none;
 }
+
+/* ---- Auto-closing notice with the same filling ring ---- */
+.notice-sheet { text-align: center; }
+.notice-icon {
+  position: relative;
+  width: 92px; height: 92px;
+  margin: 4px auto 14px;
+}
+.notice-icon .notice-ring { position: absolute; inset: 0; width: 100%; height: 100%; }
+.notice-icon .notice-ring circle {
+  fill: rgba(255, 122, 69, 0.10);
+  stroke: var(--accent);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-dasharray: 119.4;
+  stroke-dashoffset: 119.4;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  animation: notice-fill var(--notice-duration, 1800ms) linear forwards;
+}
+@keyframes notice-fill { to { stroke-dashoffset: 0; } }
+.notice-icon .notice-mark {
+  position: absolute;
+  inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 40px; font-weight: 800; line-height: 1;
+  color: var(--accent);
+}
+#notice-text { font-size: 15.5px; font-weight: 600; }
+
+/* ---- Manual frame stepping on the QR sending screen ---- */
+.send-qr-nav { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 6px 0 10px; }
+.send-qr-nav .btn { min-width: 64px; }
+
+/* Category name in settings acts as a link to that filter */
+.settings-category-row .cat-row-label.tappable { cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }

@@ -1,4 +1,4 @@
-// Vernostka main app controller - verzia v16
+// Vernostka main app controller - verzia v17
 const App = {
   cards: [],
   categories: [],
@@ -36,6 +36,7 @@ const App = {
     // rebuild it after temporarily replacing it with a custom set of buttons.
     this._confirmBtnRowTemplate = document.querySelector('#modal-confirm .btn-row').innerHTML;
 
+    this.applyVibrationToDom();
     this.renderCategoryChips();
     this.renderCategorySelect();
     this.renderSettingsCategories();
@@ -81,6 +82,7 @@ const App = {
     i18n.setLang(this.lang);
     this.theme = await DB.getSetting('theme', 'system');
     this.currentSort = await DB.getSetting('sortMode', 'frequency');
+    this.vibrationEnabled = await DB.getSetting('vibration', true);
   },
 
   applyTheme() {
@@ -92,12 +94,21 @@ const App = {
     document.querySelectorAll('#theme-segmented button').forEach((b) => b.classList.toggle('active', b.dataset.value === this.theme));
   },
 
+  applyVibrationToDom() {
+    document.querySelectorAll('#vibration-segmented button').forEach((b) => {
+      b.classList.toggle('active', (b.dataset.value === 'on') === !!this.vibrationEnabled);
+    });
+  },
+
   applyLangToDom() {
     document.documentElement.lang = this.lang;
     document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = i18n.t(el.dataset.i18n); });
     document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => { el.placeholder = i18n.t(el.dataset.i18nPlaceholder); });
     document.title = i18n.t('appName');
     document.querySelectorAll('#lang-segmented button').forEach((b) => b.classList.toggle('active', b.dataset.value === this.lang));
+    this.applyVibrationToDom();
+    const qrPlayBtn = document.getElementById('send-qr-play-btn');
+    if (qrPlayBtn) qrPlayBtn.textContent = i18n.t(this._bulkQrPlaying ? 'send_qr_pause' : 'send_qr_play');
     this.renderCategoryChips();
     this.renderCategorySelect();
     this.renderSettingsCategories();
@@ -216,6 +227,20 @@ const App = {
   },
 
   // ---------------- Navigation ----------------
+  showView(targetId) {
+    document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.target === targetId));
+    document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === targetId));
+    window.scrollTo(0, 0);
+  },
+
+  // Short confirmation buzz, honouring the Vibration setting. Not every device supports it
+  // (iPhone browsers have no vibration API at all), so this is always best-effort.
+  buzz(ms = 30) {
+    if (!this.vibrationEnabled) return;
+    if (!navigator.vibrate) return;
+    try { navigator.vibrate(ms); } catch (e) { /* ignore */ }
+  },
+
   bindNav() {
     document.querySelectorAll('.nav-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -251,6 +276,9 @@ const App = {
     document.getElementById('send-method-cancel-btn').addEventListener('click', () => this.hideModal('modal-send-method'));
     document.getElementById('send-via-file-btn').addEventListener('click', () => this.sendSelectedViaFile());
     document.getElementById('send-via-qr-btn').addEventListener('click', () => this.sendSelectedViaQr());
+    document.getElementById('send-qr-prev-btn').addEventListener('click', () => this.stepBulkQrFrame(-1));
+    document.getElementById('send-qr-next-btn').addEventListener('click', () => this.stepBulkQrFrame(1));
+    document.getElementById('send-qr-play-btn').addEventListener('click', () => this.setBulkQrPlaying(!this._bulkQrPlaying));
     document.getElementById('send-qr-close-btn').addEventListener('click', () => this.endSendQrTransfer());
     document.getElementById('send-qr-end-btn').addEventListener('click', () => this.endSendQrTransfer());
     document.getElementById('send-qr-history-btn').addEventListener('click', () => this.openTransferHistory());
@@ -390,28 +418,56 @@ const App = {
   async sendSelectedViaQr() {
     const ids = Array.from(this.selectedCardIds);
     this.hideModal('modal-send-method');
-    const cardList = await Backup.buildBulkCardList(ids);
+    await this.startQrTransfer(ids);
+    this.toggleSelectionMode(false);
+  },
+
+  // Opens the QR sending screen for the given cards. Frames can play automatically or be
+  // stepped through by hand, which helps when the other phone misses one.
+  async startQrTransfer(cardIds) {
+    const cardList = await Backup.buildBulkCardList(cardIds);
     this._bulkQrFrames = Backup.buildBulkQrFrames(cardList);
     this._bulkQrIndex = 0;
     this._sendQrStartedAt = Date.now();
     this._sendQrCardNames = cardList.map((c) => c.n || i18n.t('untitled_card'));
     document.getElementById('modal-send-qr').hidden = false;
     void document.getElementById('modal-send-qr').offsetHeight;
+    document.getElementById('send-qr-nav').hidden = this._bulkQrFrames.length <= 1;
     this.renderBulkQrFrame();
+    if (this._bulkQrFrames.length > 1) this.setBulkQrPlaying(true);
+    else this.setBulkQrPlaying(false);
+  },
+
+  // Keep cycling continuously (looping back to the start) so the receiver can catch any
+  // frame it missed on a later pass, until it is paused or the screen is closed.
+  setBulkQrPlaying(playing) {
     clearInterval(this._bulkQrTimer);
-    if (this._bulkQrFrames.length > 1) {
-      // Keep cycling continuously (looping back to the start) so the receiver can catch any
-      // frame it missed on a later pass, until the user closes this screen.
+    this._bulkQrPlaying = playing && (this._bulkQrFrames || []).length > 1;
+    if (this._bulkQrPlaying) {
       this._bulkQrTimer = setInterval(() => {
         this._bulkQrIndex = (this._bulkQrIndex + 1) % this._bulkQrFrames.length;
         this.renderBulkQrFrame();
-      }, 1800);
+      }, this.BULK_QR_INTERVAL_MS);
     }
-    this.toggleSelectionMode(false);
+    const btn = document.getElementById('send-qr-play-btn');
+    if (btn) btn.textContent = i18n.t(this._bulkQrPlaying ? 'send_qr_pause' : 'send_qr_play');
   },
+
+  // Manual step. Stepping by hand pauses the automatic cycling so the chosen code stays on
+  // screen for as long as the other phone needs it.
+  stepBulkQrFrame(delta) {
+    const total = (this._bulkQrFrames || []).length;
+    if (total <= 1) return;
+    this.setBulkQrPlaying(false);
+    this._bulkQrIndex = (this._bulkQrIndex + delta + total) % total;
+    this.renderBulkQrFrame();
+  },
+
+  BULK_QR_INTERVAL_MS: 1800,
 
   async endSendQrTransfer() {
     clearInterval(this._bulkQrTimer);
+    this._bulkQrPlaying = false;
     document.getElementById('modal-send-qr').hidden = true;
     if (this._sendQrStartedAt) {
       const durationMs = Date.now() - this._sendQrStartedAt;
@@ -605,7 +661,7 @@ const App = {
       timer = setTimeout(() => {
         fired = true;
         cancel();
-        if (navigator.vibrate) { try { navigator.vibrate(30); } catch (err) { /* ignore */ } }
+        this.buzz(30);
         this.toggleSelectionMode(true);
         this.selectedCardIds.add(card.id);
         this.updateSelectionBar();
@@ -1007,6 +1063,10 @@ const App = {
     document.getElementById('camera-denied').hidden = true;
     document.getElementById('scan-slow-hint').hidden = true;
     this.scanner = new Scanner(video);
+    // Keep the camera alive after each detected code: restarting it between the parts of a
+    // multi-part QR transfer is what made the picture flicker/re-zoom and made frames get
+    // missed. Handlers that finish a scan stop the camera themselves.
+    this.scanner.continuous = true;
     const ok = await this.scanner.start((result) => this.handleScanResult(result), (err) => this.handleCameraError(err));
     if (!ok) { this.handleCameraError(); return; }
     // If nothing gets detected for a while, nudge the user toward manual entry instead of
@@ -1050,6 +1110,9 @@ const App = {
       return;
     }
 
+    // A normal (single) code finishes the scan - stop the camera before handling it.
+    this.stopScanning();
+    if (!this.editingCard) return;
     this.editingCard.code = result.value;
     this.editingCard.codeType = result.format;
     this.editingCard.codeTypeManuallySet = true;
@@ -1068,7 +1131,7 @@ const App = {
       );
       if (!proceed) { this.startScanning(); return; }
     }
-    if (navigator.vibrate) navigator.vibrate(60);
+    this.buzz(60);
     this.scheduleDraftAutosave();
     this.switchCapturePane('manual');
   },
@@ -1103,9 +1166,10 @@ const App = {
       }
       return;
     }
-    if (navigator.vibrate) navigator.vibrate(30);
-    // Restart the camera loop to keep listening for the remaining parts.
-    this.startScanning();
+    this.buzz(30);
+    // The camera keeps running (continuous mode), so the remaining parts are picked up
+    // without restarting it - that restart is what used to make the preview flicker and
+    // caused frames to be missed on bigger transfers.
   },
 
   showScanProgress(text) {
@@ -1599,6 +1663,27 @@ const App = {
         this.applyTheme();
       });
     });
+    document.querySelectorAll('#vibration-segmented button').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        this.vibrationEnabled = btn.dataset.value === 'on';
+        await DB.setSetting('vibration', this.vibrationEnabled);
+        this.applyVibrationToDom();
+        if (this.vibrationEnabled) this.buzz(30);
+      });
+    });
+
+    // Send every saved card to another phone over QR, without going through multi-select.
+    document.getElementById('send-all-qr-btn').addEventListener('click', async () => {
+      const cards = await DB.getAllCards();
+      const ids = cards.filter((c) => !c.isDraft).map((c) => c.id);
+      if (ids.length === 0) {
+        this.showAutoNotice(i18n.t('nothing_to_show'));
+        return;
+      }
+      this.showView('view-cards');
+      await this.startQrTransfer(ids);
+    });
+
     document.getElementById('settings-add-category').addEventListener('click', async () => {
       const name = prompt(i18n.t('category_new_placeholder'));
       if (!name || !name.trim()) return;
@@ -1718,9 +1803,23 @@ const App = {
           <button class="cat-move-btn" data-dir="1" ${downDisabled} aria-label="Down">&#9660;</button>
           <button class="cat-move-btn" data-dir="-1" ${upDisabled} aria-label="Up">&#9650;</button>
         </div>
-        <span class="cat-row-label">${label}</span>
+        <span class="cat-row-label tappable" role="button" tabindex="0" title="${i18n.t('cat_open_hint')}">${label}</span>
         <span class="cat-row-count" title="${i18n.t('cat_count_title')}">${countFor(cat.id)}</span>
         <div class="cat-row-actions"><button class="cat-rename-btn" aria-label="${i18n.t('rename')}" title="${i18n.t('rename')}">&#9998;</button><button class="cat-delete-btn" aria-label="${i18n.t('delete')}" title="${i18n.t('delete')}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M10 4h4M9 7v12M15 7v12M6 7l1 13h10l1-13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>`;
+
+      // Tapping the name jumps to the cards screen with this category preselected; an
+      // empty category has nothing to show, so it says so instead.
+      row.querySelector('.cat-row-label').addEventListener('click', async () => {
+        if (countFor(cat.id) === 0) {
+          this.showAutoNotice(i18n.t('nothing_to_show'));
+          return;
+        }
+        this.currentCategoryFilter = cat.id;
+        document.getElementById('search-input').value = '';
+        this.renderCategoryChips();
+        await this.renderCardsList();
+        this.showView('view-cards');
+      });
 
       row.querySelectorAll('.cat-move-btn').forEach((btn) => {
         btn.addEventListener('click', () => this.moveCategory(cat, Number(btn.dataset.dir)));
@@ -1856,12 +1955,16 @@ const App = {
 
   // Called after any data mutation: schedules silent Android backup, or flags
   // "unsaved changes" reminder for iOS/unsupported browsers.
-  onDataChanged() {
+  async onDataChanged() {
     if (Backup.hasActiveFolderPermission()) {
       Backup.scheduleDebouncedBackup();
       setTimeout(() => this.updateBackupStatusUI(), 8000);
     } else if (!Backup.supportsFS) {
       Backup.markDirty();
+      // Nothing left to back up (all cards deleted, or the last one removed) - asking to
+      // save a backup of an empty list would only be in the way.
+      const cards = await DB.getAllCards();
+      if (cards.length === 0) return;
       this.maybeShowUnsavedReminder();
     }
   },
@@ -1978,6 +2081,22 @@ const App = {
       });
       this.showModal('modal-confirm');
     });
+  },
+
+  // Short message with an exclamation mark and a ring that fills up (same look as the
+  // long-press indicator); it closes by itself when the ring is full.
+  showAutoNotice(text, ms = 1800) {
+    const modal = document.getElementById('modal-notice');
+    document.getElementById('notice-text').textContent = text;
+    const ring = modal.querySelector('.notice-ring circle');
+    modal.style.setProperty('--notice-duration', ms + 'ms');
+    // restart the ring animation from zero on every call
+    ring.style.animation = 'none';
+    void ring.offsetWidth;
+    ring.style.animation = '';
+    this.showModal('modal-notice');
+    clearTimeout(this._noticeTimer);
+    this._noticeTimer = setTimeout(() => this.hideModal('modal-notice'), ms);
   },
 
   toast(msg) {

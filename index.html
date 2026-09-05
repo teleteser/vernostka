@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Vernostka - verzia v16 -->
+<!-- Vernostka - verzia v17 -->
 <html lang="sk">
 <head>
 <meta charset="UTF-8">
@@ -94,6 +94,15 @@
       </div>
 
       <div class="settings-group">
+        <h3 data-i18n="settings_vibration">Vibracie</h3>
+        <div class="segmented" id="vibration-segmented">
+          <button data-value="on" data-i18n="vibration_on">Zapnute</button>
+          <button data-value="off" data-i18n="vibration_off">Vypnute</button>
+        </div>
+        <p class="hint" data-i18n="vibration_hint">Kratka vibracia pri dlhom stlaceni karty. Niektore zariadenia (iPhone) vibracie vo webovej aplikacii nepodporuju.</p>
+      </div>
+
+      <div class="settings-group">
         <h3 data-i18n="settings_categories">Kategorie</h3>
         <div id="settings-category-list" class="settings-category-list"></div>
         <button id="settings-add-category" class="btn btn-ghost" data-i18n="category_add_new">+ Pridat vlastnu kategoriu</button>
@@ -109,6 +118,7 @@
           <button id="backup-now-btn" class="btn btn-secondary" data-i18n="backup_now">Zalohovat teraz</button>
           <button id="export-backup-btn" class="btn btn-secondary" data-i18n="backup_export_manual">Exportovat zalohu</button>
         </div>
+        <button id="send-all-qr-btn" class="btn btn-secondary" data-i18n="send_all_qr">Prenos vsetkych kariet cez QR</button>
         <button id="import-backup-btn" class="btn btn-ghost" data-i18n="backup_import">Obnovit zo zalohy</button>
         <input type="file" id="import-file-input" accept="application/json,.json,.txt,text/plain" hidden>
       </div>
@@ -349,6 +359,11 @@
     <div class="send-qr-controls">
       <p class="hint center" data-i18n="send_qr_hint">Druhy telefon nech otvori Skenovat.</p>
       <p id="send-qr-progress" class="hint center send-qr-progress" hidden></p>
+      <div id="send-qr-nav" class="send-qr-nav" hidden>
+        <button id="send-qr-prev-btn" class="btn btn-secondary small" aria-label="Predchadzajuci">&#9664;</button>
+        <button id="send-qr-play-btn" class="btn btn-secondary small" data-i18n="send_qr_pause">Pozastavit</button>
+        <button id="send-qr-next-btn" class="btn btn-secondary small" aria-label="Dalsi">&#9654;</button>
+      </div>
       <button id="send-qr-end-btn" class="btn btn-primary" data-i18n="send_end_transfer">Ukoncit prenos</button>
       <button id="send-qr-history-btn" class="btn btn-ghost small" data-i18n="send_history_button">Historia prenosov</button>
     </div>
@@ -371,6 +386,17 @@
       <div id="bulk-category-list" class="chip-row wrap"></div>
       <button id="bulk-category-new-btn" class="btn btn-secondary" data-i18n="bulk_assign_new_category">VYTVORIT NOVU KATEGORIU</button>
       <button id="bulk-category-cancel-btn" class="btn btn-ghost" data-i18n="cancel">Zrusit</button>
+    </div>
+  </div>
+
+  <!-- ===================== AUTO-CLOSING NOTICE ===================== -->
+  <div id="modal-notice" class="modal-overlay" hidden>
+    <div class="modal-sheet notice-sheet">
+      <div class="notice-icon">
+        <svg class="notice-ring" viewBox="0 0 44 44"><circle cx="22" cy="22" r="19"></circle></svg>
+        <span class="notice-mark">!</span>
+      </div>
+      <p id="notice-text"></p>
     </div>
   </div>
 

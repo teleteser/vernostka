@@ -71,16 +71,23 @@ const Backup = {
   },
 
   // Returns an array of QR-ready strings (frames) to display, one at a time, in sequence.
+  // Every frame is built to exactly the same length (frame numbers padded with zeros, the
+  // last chunk padded with spaces, which JSON ignores). Same length means every QR code has
+  // the same size and module count, so the picture no longer appears to grow/shrink between
+  // frames - that jumping is what made the receiving camera lose codes.
   buildBulkQrFrames(cardList) {
     const payloadStr = JSON.stringify(cardList);
     if (payloadStr.length <= this.BULK_CHUNK_SIZE) {
       return [this.BULK_SINGLE_PREFIX + payloadStr];
     }
     const total = Math.ceil(payloadStr.length / this.BULK_CHUNK_SIZE);
+    const width = String(total).length;
     const frames = [];
     for (let i = 0; i < total; i++) {
-      const chunk = payloadStr.slice(i * this.BULK_CHUNK_SIZE, (i + 1) * this.BULK_CHUNK_SIZE);
-      frames.push(`${this.BULK_MULTI_PREFIX}${i + 1}/${total}:${chunk}`);
+      let chunk = payloadStr.slice(i * this.BULK_CHUNK_SIZE, (i + 1) * this.BULK_CHUNK_SIZE);
+      if (chunk.length < this.BULK_CHUNK_SIZE) chunk = chunk + ' '.repeat(this.BULK_CHUNK_SIZE - chunk.length);
+      const index = String(i + 1).padStart(width, '0');
+      frames.push(`${this.BULK_MULTI_PREFIX}${index}/${total}:${chunk}`);
     }
     return frames;
   },
