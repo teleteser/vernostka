@@ -1,4 +1,4 @@
-// Vernostka main app controller - verzia v15
+// Vernostka main app controller - verzia v16
 const App = {
   cards: [],
   categories: [],
@@ -20,6 +20,7 @@ const App = {
     await this.ensureDefaultCategories();
     await this.dedupeCategories();
     await this.loadCategories();
+    await this.migrateCardCategories();
     this.cards = await DB.getAllCards();
 
     this.bindNav();
@@ -144,8 +145,9 @@ const App = {
       const allCards = await DB.getAllCards();
       for (const dup of duplicates) {
         for (const card of allCards) {
-          if (card.categoryId === dup.id) {
-            card.categoryId = survivor.id;
+          const ids = this.cardCategoryIds(card);
+          if (ids.indexOf(dup.id) !== -1) {
+            this.setCardCategoryIds(card, ids.map((id) => (id === dup.id ? survivor.id : id)));
             await DB.putCard(card);
           }
         }
@@ -153,6 +155,43 @@ const App = {
       }
     }
     return changed;
+  },
+
+  // ---- Card categories ----
+  // A card can belong to several categories at once. They are stored in card.categoryIds;
+  // card.categoryId is kept in sync with the first one so older backups/exports still work.
+  cardCategoryIds(card) {
+    if (!card) return [];
+    if (Array.isArray(card.categoryIds)) return card.categoryIds.filter(Boolean);
+    return card.categoryId ? [card.categoryId] : [];
+  },
+
+  setCardCategoryIds(card, ids) {
+    const unique = [];
+    (ids || []).forEach((id) => { if (id && unique.indexOf(id) === -1) unique.push(id); });
+    card.categoryIds = unique;
+    card.categoryId = unique[0] || null;
+    return card;
+  },
+
+  cardCategoryLabels(card) {
+    return this.cardCategoryIds(card)
+      .map((id) => {
+        const cat = this.categories.find((c) => c.id === id);
+        return cat ? this.categoryLabel(cat) : '';
+      })
+      .filter(Boolean);
+  },
+
+  // Upgrades cards saved by older versions (single categoryId) to the multi-category shape.
+  async migrateCardCategories() {
+    const cards = await DB.getAllCards();
+    for (const card of cards) {
+      if (!Array.isArray(card.categoryIds)) {
+        this.setCardCategoryIds(card, card.categoryId ? [card.categoryId] : []);
+        await DB.putCard(card);
+      }
+    }
   },
 
   async loadCategories() {
@@ -200,7 +239,10 @@ const App = {
     document.getElementById('selection-select-all-btn').addEventListener('click', () => this.selectAllVisible());
     document.getElementById('selection-assign-btn').addEventListener('click', () => this.openBulkCategoryAssign());
     document.getElementById('selection-send-btn').addEventListener('click', () => this.openSendMethodDialog());
-    document.getElementById('bulk-category-cancel-btn').addEventListener('click', () => this.hideModal('modal-bulk-category'));
+    document.getElementById('bulk-category-cancel-btn').addEventListener('click', () => {
+      if (this._bulkCategoryCloseHandler) this._bulkCategoryCloseHandler();
+      else this.hideModal('modal-bulk-category');
+    });
     // Always-available "create new category" action inside the assign-category sheet, so a
     // new category can be made even when none exist yet.
     document.getElementById('bulk-category-new-btn').addEventListener('click', () => {
@@ -243,15 +285,35 @@ const App = {
 
   openBulkCategoryAssign() {
     if (this.selectedCardIds.size === 0) return;
+    document.getElementById('bulk-category-cancel-btn').textContent = i18n.t('done');
+    this._bulkCategoryNewHandler = async () => {
+      const newId = await this.createCategoryPrompt();
+      if (newId) await this.applyBulkCategory(newId, 'add');
+    };
+    this._bulkCategoryCloseHandler = () => {
+      this._bulkCategoryCloseHandler = null;
+      this.hideModal('modal-bulk-category');
+      this.toggleSelectionMode(false);
+    };
+    this.renderBulkCategoryChips();
+    this.showModal('modal-bulk-category');
+  },
+
+  // Chips for the bulk assign sheet. A chip is active when EVERY selected card already has
+  // that category; clicking it adds the category to the selection, clicking an active one
+  // removes it again. The sheet stays open so several categories can be assigned at once.
+  renderBulkCategoryChips() {
     document.getElementById('bulk-assign-desc').textContent = i18n.t('bulk_assign_desc', { count: this.selectedCardIds.size });
     const listEl = document.getElementById('bulk-category-list');
     listEl.innerHTML = '';
+    const selectedCards = this.cards.filter((c) => this.selectedCardIds.has(c.id));
     this.categories.forEach((cat) => {
+      const onAll = selectedCards.length > 0 && selectedCards.every((c) => this.cardCategoryIds(c).indexOf(cat.id) !== -1);
       const chip = document.createElement('button');
       chip.type = 'button';
-      chip.className = 'chip';
+      chip.className = 'chip' + (onAll ? ' active' : '');
       chip.textContent = this.categoryLabel(cat);
-      chip.addEventListener('click', () => this.applyBulkCategory(cat.id));
+      chip.addEventListener('click', () => this.applyBulkCategory(cat.id, onAll ? 'remove' : 'add'));
       listEl.appendChild(chip);
     });
     if (this.categories.length === 0) {
@@ -260,11 +322,6 @@ const App = {
       empty.textContent = i18n.t('bulk_assign_empty');
       listEl.appendChild(empty);
     }
-    this._bulkCategoryNewHandler = async () => {
-      const newId = await this.createCategoryPrompt();
-      if (newId) await this.applyBulkCategory(newId);
-    };
-    this.showModal('modal-bulk-category');
   },
 
   // Asks for a new category name and stores it. Returns the new category id, or null when
@@ -282,19 +339,24 @@ const App = {
     return newCat.id;
   },
 
-  async applyBulkCategory(categoryId) {
+  // mode 'add' adds the category to every selected card (keeping the ones they already
+  // have), 'remove' takes it away. A card is never listed twice in the same category.
+  async applyBulkCategory(categoryId, mode = 'add') {
     const ids = Array.from(this.selectedCardIds);
     for (const id of ids) {
       const card = await DB.getCard(id);
-      if (card) {
-        card.categoryId = categoryId;
-        await DB.putCard(card);
-      }
+      if (!card) continue;
+      const current = this.cardCategoryIds(card);
+      let next;
+      if (mode === 'remove') next = current.filter((cid) => cid !== categoryId);
+      else next = current.indexOf(categoryId) === -1 ? current.concat([categoryId]) : current;
+      this.setCardCategoryIds(card, next);
+      await DB.putCard(card);
     }
-    this.hideModal('modal-bulk-category');
-    this.toast(i18n.t('bulk_assign_done', { count: ids.length }));
-    this.toggleSelectionMode(false);
+    this.toast(i18n.t(mode === 'remove' ? 'bulk_unassign_done' : 'bulk_assign_done', { count: ids.length }));
     await this.renderCardsList();
+    this.renderBulkCategoryChips();
+    this.renderSettingsCategories();
     this.onDataChanged();
   },
 
@@ -434,7 +496,7 @@ const App = {
     const search = document.getElementById('search-input').value.trim().toLowerCase();
 
     let filtered = this.cards.filter((c) => {
-      if (this.currentCategoryFilter !== 'all' && c.categoryId !== this.currentCategoryFilter) return false;
+      if (this.currentCategoryFilter !== 'all' && this.cardCategoryIds(c).indexOf(this.currentCategoryFilter) === -1) return false;
       if (search && !c.storeName.toLowerCase().includes(search)) return false;
       return true;
     });
@@ -500,12 +562,73 @@ const App = {
       </div>
       <div class="card-row-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     `;
+    this.attachLongPressSelect(row, card);
     row.addEventListener('click', () => {
       if (this.selectionMode) { this.toggleCardSelection(card.id); return; }
       if (card.isDraft) this.openEditCard(card);
       else this.openCardDetail(card);
     });
     return row;
+  },
+
+  LONG_PRESS_MS: 550,
+
+  // Holding a card switches to multi-select mode with that card already ticked. A ring
+  // fills up around the finger while it is held, so it is visible that something is about
+  // to happen; moving the finger or letting go too early cancels it and nothing changes.
+  attachLongPressSelect(row, card) {
+    let timer = null;
+    let ring = null;
+    let startX = 0, startY = 0;
+    let fired = false;
+
+    const cancel = () => {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (ring) { ring.remove(); ring = null; }
+      row.classList.remove('long-pressing');
+    };
+
+    const start = (e) => {
+      if (this.selectionMode) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      cancel();
+      fired = false;
+      startX = e.clientX; startY = e.clientY;
+      ring = document.createElement('div');
+      ring.className = 'longpress-ring';
+      ring.style.left = e.clientX + 'px';
+      ring.style.top = e.clientY + 'px';
+      ring.style.setProperty('--lp-duration', this.LONG_PRESS_MS + 'ms');
+      ring.innerHTML = '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="17"></circle></svg>';
+      document.body.appendChild(ring);
+      row.classList.add('long-pressing');
+      timer = setTimeout(() => {
+        fired = true;
+        cancel();
+        if (navigator.vibrate) { try { navigator.vibrate(30); } catch (err) { /* ignore */ } }
+        this.toggleSelectionMode(true);
+        this.selectedCardIds.add(card.id);
+        this.updateSelectionBar();
+        this.renderCardsList();
+      }, this.LONG_PRESS_MS);
+    };
+
+    const move = (e) => {
+      if (!timer) return;
+      if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) cancel();
+    };
+
+    // Runs before the row's own click handler, so the click that ends a long press does not
+    // also open the card.
+    row.addEventListener('click', (e) => {
+      if (fired) { fired = false; e.stopImmediatePropagation(); e.preventDefault(); }
+    });
+    row.addEventListener('pointerdown', start);
+    row.addEventListener('pointermove', move);
+    row.addEventListener('pointerup', cancel);
+    row.addEventListener('pointercancel', cancel);
+    row.addEventListener('pointerleave', cancel);
+    row.addEventListener('contextmenu', (e) => { if (fired) e.preventDefault(); });
   },
 
   // Assigns a stable "Koncept N" number to unnamed draft cards, based on creation order
@@ -587,7 +710,14 @@ const App = {
       this.renderLogoPreview();
       this.scheduleDraftAutosave();
     });
-    document.getElementById('field-category').addEventListener('change', (e) => { this.editingCard.categoryId = e.target.value; this.scheduleDraftAutosave(); });
+    document.getElementById('field-category-new-btn').addEventListener('click', async () => {
+      const newId = await this.createCategoryPrompt();
+      if (newId && this.editingCard) {
+        this.setCardCategoryIds(this.editingCard, this.cardCategoryIds(this.editingCard).concat([newId]));
+        this.renderCategorySelect();
+        this.scheduleDraftAutosave();
+      }
+    });
     document.getElementById('field-note').addEventListener('input', (e) => { this.editingCard.note = e.target.value; this.scheduleDraftAutosave(); });
 
     document.getElementById('add-location-btn').addEventListener('click', () => this.openLocationPicker(null));
@@ -675,14 +805,36 @@ const App = {
     }
   },
 
+  // Category picker inside the add/edit card form: one toggle chip per category, several
+  // can be active at once, and none is a valid state (card without a category).
   renderCategorySelect() {
-    const sel = document.getElementById('field-category');
-    sel.innerHTML = '';
+    const el = document.getElementById('field-category-chips');
+    if (!el) return;
+    el.innerHTML = '';
+    const active = this.cardCategoryIds(this.editingCard);
     this.categories.forEach((cat) => {
-      const opt = document.createElement('option');
-      opt.value = cat.id; opt.textContent = this.categoryLabel(cat);
-      sel.appendChild(opt);
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip' + (active.indexOf(cat.id) !== -1 ? ' active' : '');
+      chip.textContent = this.categoryLabel(cat);
+      chip.addEventListener('click', () => {
+        if (!this.editingCard) return;
+        const current = this.cardCategoryIds(this.editingCard);
+        const next = current.indexOf(cat.id) !== -1
+          ? current.filter((id) => id !== cat.id)
+          : current.concat([cat.id]);
+        this.setCardCategoryIds(this.editingCard, next);
+        this.renderCategorySelect();
+        this.scheduleDraftAutosave();
+      });
+      el.appendChild(chip);
     });
+    if (this.categories.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'hint';
+      empty.textContent = i18n.t('bulk_assign_empty');
+      el.appendChild(empty);
+    }
   },
 
   openAddCard() {
@@ -693,6 +845,7 @@ const App = {
       code: '',
       codeType: 'CODE128',
       codeTypeManuallySet: false,
+      categoryIds: this.categories[0] ? [this.categories[0].id] : [],
       categoryId: this.categories[0] ? this.categories[0].id : null,
       note: '',
       logo: null,
@@ -741,7 +894,6 @@ const App = {
     document.getElementById('field-note').value = this.editingCard.note || '';
     document.getElementById('store-suggestions').innerHTML = '';
     this.renderCategorySelect();
-    document.getElementById('field-category').value = this.editingCard.categoryId || '';
     this.renderLogoPreview();
     this.renderManualCodePreview();
     this.renderLocationList();
@@ -970,24 +1122,27 @@ const App = {
 
   // Builds and saves a local card from one shared/received compact card object.
   async createCardFromShared(shared, strategy, fixedCategoryId) {
-    let categoryId = null;
+    let categoryIds = [];
     if (strategy === 'none') {
-      categoryId = null;
+      categoryIds = [];
     } else if (strategy === 'choose') {
-      categoryId = fixedCategoryId || null;
+      categoryIds = fixedCategoryId ? [fixedCategoryId] : [];
     } else {
       // 'keep' (default): try to find a local category with the same label as on the
       // sending phone; if none exists yet, recreate it locally so nothing gets lost.
-      if (shared.cat) {
-        const match = this.categories.find((c) => this.categoryLabel(c).toLowerCase() === String(shared.cat).toLowerCase());
+      const sharedLabels = Array.isArray(shared.cats) && shared.cats.length
+        ? shared.cats.filter(Boolean)
+        : (shared.cat ? [shared.cat] : []);
+      for (const label of sharedLabels) {
+        const match = this.categories.find((c) => this.categoryLabel(c).toLowerCase() === String(label).toLowerCase());
         if (match) {
-          categoryId = match.id;
+          if (categoryIds.indexOf(match.id) === -1) categoryIds.push(match.id);
         } else {
           const nextOrder = this.categories.reduce((max, c) => Math.max(max, c.order || 0), -1) + 1;
-          const newCat = { id: DB.uid(), builtin: null, name: shared.cat, order: nextOrder };
+          const newCat = { id: DB.uid(), builtin: null, name: label, order: nextOrder };
           await DB.putCategory(newCat);
           await this.loadCategories();
-          categoryId = newCat.id;
+          categoryIds.push(newCat.id);
         }
       }
     }
@@ -996,7 +1151,8 @@ const App = {
       storeName: (shared.n && shared.n.trim()) || i18n.t('untitled_card'),
       code: shared.c || '',
       codeType: shared.t || guessCodeType(shared.c || ''),
-      categoryId,
+      categoryIds,
+      categoryId: categoryIds[0] || null,
       note: shared.note || '',
       logo: null,
       logoColor: shared.lc || '#1E3A5F',
@@ -1070,9 +1226,12 @@ const App = {
       const finish = (value) => {
         if (settled) return;
         settled = true;
+        this._bulkCategoryCloseHandler = null;
         this.hideModal('modal-bulk-category');
         resolve(value);
       };
+      document.getElementById('bulk-category-cancel-btn').textContent = i18n.t('cancel');
+      this._bulkCategoryCloseHandler = () => finish(null);
       document.getElementById('bulk-assign-desc').textContent = i18n.t('pick_category_desc');
       const listEl = document.getElementById('bulk-category-list');
       listEl.innerHTML = '';
@@ -1094,7 +1253,6 @@ const App = {
         const newId = await this.createCategoryPrompt();
         if (newId) finish(newId);
       };
-      document.getElementById('bulk-category-cancel-btn').addEventListener('click', () => finish(null), { once: true });
       this.showModal('modal-bulk-category');
     });
   },
@@ -1131,7 +1289,7 @@ const App = {
     { key: 'code', labelKey: 'card_code_label' },
     { key: 'abbreviation', labelKey: 'abbreviation_label' },
     { key: 'note', labelKey: 'note_label' },
-    { key: 'categoryId', labelKey: 'category_label', isCategory: true }
+    { key: 'categoryIds', labelKey: 'category_label', isCategory: true }
   ],
 
   buildEditDiffText(before, after) {
@@ -1140,10 +1298,8 @@ const App = {
       let oldVal = before[f.key] || '';
       let newVal = after[f.key] || '';
       if (f.isCategory) {
-        const oldCat = this.categories.find((c) => c.id === oldVal);
-        const newCat = this.categories.find((c) => c.id === newVal);
-        oldVal = oldCat ? this.categoryLabel(oldCat) : '';
-        newVal = newCat ? this.categoryLabel(newCat) : '';
+        oldVal = this.cardCategoryLabels(before).join(', ');
+        newVal = this.cardCategoryLabels(after).join(', ');
       }
       if (oldVal !== newVal) {
         lines.push(`${i18n.t(f.labelKey)}: "${oldVal || '-'}" > "${newVal || '-'}"`);
@@ -1538,8 +1694,18 @@ const App = {
     this.onDataChanged();
   },
 
-  renderSettingsCategories() {
+  // Slovak/English wording for "N cards in this category".
+  categoryCountText(count) {
+    if (count === 0) return i18n.t('cat_count_zero');
+    if (count === 1) return i18n.t('cat_count_one');
+    if (count >= 2 && count <= 4) return i18n.t('cat_count_few', { count });
+    return i18n.t('cat_count_many', { count });
+  },
+
+  async renderSettingsCategories() {
     const el = document.getElementById('settings-category-list');
+    const allCards = await DB.getAllCards();
+    const countFor = (id) => allCards.filter((c) => this.cardCategoryIds(c).indexOf(id) !== -1).length;
     el.innerHTML = '';
     this.categories.forEach((cat, idx) => {
       const row = document.createElement('div');
@@ -1553,7 +1719,8 @@ const App = {
           <button class="cat-move-btn" data-dir="-1" ${upDisabled} aria-label="Up">&#9650;</button>
         </div>
         <span class="cat-row-label">${label}</span>
-        <div class="cat-row-actions"><button class="cat-rename-btn" aria-label="${i18n.t('rename')}">&#9998;</button><button class="cat-delete-btn">${i18n.t('delete')}</button></div>`;
+        <span class="cat-row-count" title="${i18n.t('cat_count_title')}">${countFor(cat.id)}</span>
+        <div class="cat-row-actions"><button class="cat-rename-btn" aria-label="${i18n.t('rename')}" title="${i18n.t('rename')}">&#9998;</button><button class="cat-delete-btn" aria-label="${i18n.t('delete')}" title="${i18n.t('delete')}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M10 4h4M9 7v12M15 7v12M6 7l1 13h10l1-13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>`;
 
       row.querySelectorAll('.cat-move-btn').forEach((btn) => {
         btn.addEventListener('click', () => this.moveCategory(cat, Number(btn.dataset.dir)));
@@ -1579,27 +1746,43 @@ const App = {
         // that one isn't available (e.g. it was deleted, or this very category IS "Ine").
         const otherCat = this.categories.find((c) => c.builtin === 'category_other' && c.id !== cat.id)
           || this.categories.find((c) => c.id !== cat.id);
+        // Count the cards actually in this category first - an empty category must not
+        // claim it contains cards, and moving cards makes no sense with nothing to move.
+        const allCards = await DB.getAllCards();
+        const affected = allCards.filter((c) => this.cardCategoryIds(c).indexOf(cat.id) !== -1);
+        const count = affected.length;
         const buttons = [
           { label: i18n.t('cancel'), value: 'cancel', className: 'btn-ghost' }
         ];
-        if (otherCat) buttons.push({ label: i18n.t('category_delete_move'), value: 'move', className: 'btn-secondary' });
-        buttons.push({ label: i18n.t('category_delete_remove_cards'), value: 'delete', className: 'btn-danger' });
+        buttons.push({
+          label: i18n.t('category_delete_move'),
+          value: 'move',
+          className: 'btn-secondary',
+          disabled: count === 0 || !otherCat
+        });
+        buttons.push({
+          label: count === 0 ? i18n.t('category_delete_only') : i18n.t('category_delete_remove_cards'),
+          value: 'delete',
+          className: 'btn-danger'
+        });
         const choice = await this.threeWayDialog(
           i18n.t('category_delete_choice_title'),
-          i18n.t('category_delete_choice_desc', { name: label2 }),
+          i18n.t('category_delete_choice_desc', { name: label2, cards: this.categoryCountText(count) }),
           buttons,
           true
         );
         if (!choice || choice === 'cancel') return;
-        const allCards = await DB.getAllCards();
-        const affected = allCards.filter((c) => c.categoryId === cat.id);
         if (choice === 'move') {
           for (const c of affected) {
-            c.categoryId = otherCat ? otherCat.id : null;
+            const next = this.cardCategoryIds(c).filter((id) => id !== cat.id);
+            if (otherCat && next.indexOf(otherCat.id) === -1) next.push(otherCat.id);
+            this.setCardCategoryIds(c, next);
             await DB.putCard(c);
           }
         } else if (choice === 'delete') {
-          for (const c of affected) await DB.deleteCard(c.id);
+          if (count > 0) {
+            for (const c of affected) await DB.deleteCard(c.id);
+          }
         }
         await DB.deleteCategory(cat.id);
         await this.loadCategories();
@@ -1622,6 +1805,7 @@ const App = {
     await Backup.applyImport(payload, mode);
     await this.ensureDefaultCategories();
     await this.dedupeCategories();
+    await this.migrateCardCategories();
     await this.loadCategories();
     this.renderCategoryChips();
     this.renderCategorySelect();
@@ -1781,9 +1965,11 @@ const App = {
       btnRow.innerHTML = '';
       buttons.forEach((b) => {
         const btn = document.createElement('button');
-        btn.className = 'btn ' + (b.className || 'btn-ghost');
+        btn.className = 'btn ' + (b.className || 'btn-ghost') + (b.disabled ? ' btn-struck' : '');
         btn.textContent = b.label;
+        if (b.disabled) btn.disabled = true;
         btn.addEventListener('click', () => {
+          if (b.disabled) return;
           this.hideModal('modal-confirm');
           btnRow.innerHTML = this._confirmBtnRowTemplate;
           resolve(b.value);

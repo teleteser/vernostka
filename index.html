@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Vernostka - verzia v15 -->
+<!-- Vernostka - verzia v16 -->
 <html lang="sk">
 <head>
 <meta charset="UTF-8">
@@ -213,8 +213,10 @@
           </div>
         </div>
 
-        <label class="field-label" data-i18n="category_label">Kategoria</label>
-        <select id="field-category"></select>
+        <label class="field-label" data-i18n="category_label">Kategorie</label>
+        <p class="hint" data-i18n="category_multi_hint">Karta moze patrit do viacerych kategorii.</p>
+        <div id="field-category-chips" class="chip-row wrap"></div>
+        <button type="button" id="field-category-new-btn" class="btn btn-ghost" data-i18n="category_add_new">+ Pridat vlastnu kategoriu</button>
 
         <label class="field-label" data-i18n="note_label">Poznamka (nepovinne)</label>
         <textarea id="field-note" rows="2" autocomplete="off" data-i18n-placeholder="note_placeholder" placeholder="napr. PIN..."></textarea>

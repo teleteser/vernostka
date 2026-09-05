@@ -52,13 +52,17 @@ const Backup = {
       if (!cat) return '';
       return (cat.name && cat.name.trim()) ? cat.name.trim() : (cat.builtin ? i18n.t(cat.builtin) : '');
     };
+    // A card can be in several categories: they travel as "cats" (list of labels), while
+    // "cat" keeps the first one so an older version on the other phone still understands it.
+    const cardCategoryIds = (c) => (Array.isArray(c.categoryIds) ? c.categoryIds.filter(Boolean) : (c.categoryId ? [c.categoryId] : []));
     return allCards
       .filter((c) => idSet.has(c.id))
       .map((c) => ({
         n: c.storeName || '',
         c: c.code || '',
         t: c.codeType || 'CODE128',
-        cat: categoryLabelById(c.categoryId),
+        cats: cardCategoryIds(c).map(categoryLabelById).filter(Boolean),
+        cat: categoryLabelById(cardCategoryIds(c)[0]),
         note: c.note || '',
         ab: c.abbreviation || '',
         lc: c.logoColor || '',
@@ -128,7 +132,11 @@ const Backup = {
     const [allCards, allCategories] = await Promise.all([DB.getAllCards(), DB.getAllCategories()]);
     const idSet = new Set(cardIds);
     const cards = allCards.filter((c) => idSet.has(c.id));
-    const usedCategoryIds = new Set(cards.map((c) => c.categoryId).filter(Boolean));
+    const usedCategoryIds = new Set();
+    cards.forEach((c) => {
+      const ids = Array.isArray(c.categoryIds) ? c.categoryIds : (c.categoryId ? [c.categoryId] : []);
+      ids.filter(Boolean).forEach((id) => usedCategoryIds.add(id));
+    });
     const categories = allCategories.filter((c) => usedCategoryIds.has(c.id));
     return {
       appId: 'vernostka',
