@@ -270,6 +270,24 @@ const Backup = {
     }
   },
 
+  // Saves the backup straight to a file (no share sheet in between) - on Android that means
+  // the browser's download folder. Returns the filename that was written.
+  async downloadBackupFile() {
+    const payload = await this.buildBackupPayload();
+    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+    const downloadFilename = this.filenameForNow();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = downloadFilename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    await DB.setSetting('lastBackupAt', Date.now());
+    return downloadFilename;
+  },
+
   // ---- Manual export (fallback for iOS Safari, or on-demand anywhere) ----
   async exportToFile() {
     const payload = await this.buildBackupPayload();

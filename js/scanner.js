@@ -76,7 +76,13 @@ class Scanner {
 
   _shouldReport(value) {
     const now = Date.now();
-    if (value === this._lastValue && now - this._lastValueAt < 1000) return false;
+    // The same code stays in front of the camera for as long as the other phone shows it
+    // (about 2 seconds), and it is detected many times per second. Report it only once -
+    // otherwise the same transfer frame is handled (and the phone buzzes) repeatedly.
+    if (value === this._lastValue && now - this._lastValueAt < 5000) {
+      this._lastValueAt = now;
+      return false;
+    }
     this._lastValue = value;
     this._lastValueAt = now;
     return true;

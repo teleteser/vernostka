@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Vernostka - verzia v18 -->
+<!-- Vernostka - verzia v19 -->
 <html lang="sk">
 <head>
 <meta charset="UTF-8">
@@ -169,7 +169,11 @@
           <div class="scan-reticle"></div>
         </div>
         <p class="hint center" data-i18n="scan_hint">Namier fotoaparat na kod.</p>
-        <p id="scan-progress-hint" class="hint center scan-progress-hint" hidden></p>
+        <div id="scan-progress" class="transfer-progress" hidden>
+          <p id="scan-progress-hint" class="transfer-progress-text"></p>
+          <div id="scan-progress-bar" class="progress-segments"></div>
+          <p id="scan-progress-sub" class="hint center"></p>
+        </div>
         <div class="btn-row center">
           <button id="switch-camera-btn" class="btn btn-ghost small" data-i18n="scan_switch_camera">Prepnut kameru</button>
           <button id="photo-scan-btn" class="btn btn-ghost small" data-i18n="photo_scan_button">Odfotit kod</button>
@@ -358,7 +362,10 @@
     </div>
     <div class="send-qr-controls">
       <p class="hint center" data-i18n="send_qr_hint">Druhy telefon nech otvori Skenovat.</p>
-      <p id="send-qr-progress" class="hint center send-qr-progress" hidden></p>
+      <div id="send-qr-progress-wrap" hidden>
+        <p id="send-qr-progress" class="transfer-progress-text"></p>
+        <div id="send-qr-bar" class="progress-segments"></div>
+      </div>
       <div id="send-qr-nav" class="send-qr-nav" hidden>
         <button id="send-qr-prev-btn" class="btn btn-secondary small" aria-label="Predchadzajuci">&#9664;</button>
         <button id="send-qr-play-btn" class="btn btn-secondary small" data-i18n="send_qr_pause">Pozastavit</button>
@@ -386,6 +393,25 @@
       <div id="bulk-category-list" class="chip-row wrap"></div>
       <button id="bulk-category-new-btn" class="btn btn-secondary" data-i18n="bulk_assign_new_category">VYTVORIT NOVU KATEGORIU</button>
       <button id="bulk-category-cancel-btn" class="btn btn-ghost" data-i18n="cancel">Zrusit</button>
+    </div>
+  </div>
+
+  <!-- ===================== INSTALL / ADD TO HOME SCREEN ===================== -->
+  <div id="modal-install" class="modal-overlay" hidden>
+    <div class="modal-sheet big install-sheet">
+      <h3 id="install-title" data-i18n="install_prompt_title">Pridaj Vernostku na plochu</h3>
+      <p id="install-desc" data-i18n="install_prompt_desc">Ak appku nepridas na plochu, prehliadac moze po case vymazat lokalne ulozene data.</p>
+      <button id="install-now-btn" class="btn btn-primary install-main-btn" data-i18n="install_now" hidden>Instalovat teraz</button>
+      <div class="install-steps">
+        <h4 data-i18n="install_android_title">Android (Chrome)</h4>
+        <p data-i18n="install_android_steps">Menu s tromi bodkami vpravo hore, potom "Pridat na plochu" alebo "Instalovat aplikaciu".</p>
+        <h4 data-i18n="install_ios_title">iPhone (Safari)</h4>
+        <p data-i18n="ios_install_steps">V Safari klikni na tlacidlo Zdielat, potom "Pridat na plochu".</p>
+      </div>
+      <div class="btn-row">
+        <button id="install-later-btn" class="btn btn-ghost" data-i18n="install_later">Neskor</button>
+        <button id="install-dismiss-btn" class="btn btn-ghost" data-i18n="install_dismiss">Uz nezobrazovat</button>
+      </div>
     </div>
   </div>
 

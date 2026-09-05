@@ -699,3 +699,44 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 
 /* Category name in settings acts as a link to that filter */
 .settings-category-row .cat-row-label.tappable { cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+
+/* ---- Transfer progress (sending and receiving QR codes) ---- */
+.transfer-progress { margin: 10px 0 4px; }
+.transfer-progress-text {
+  text-align: center;
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.send-qr-controls .transfer-progress-text { color: #111; }
+.progress-segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+.progress-segment {
+  flex: 1 1 10px;
+  min-width: 8px;
+  max-width: 34px;
+  height: 14px;
+  border-radius: 3px;
+  background: rgba(120,130,140,0.28);
+  border: 1px solid rgba(120,130,140,0.35);
+}
+.progress-segment.filled { background: var(--success, #2E9E5B); border-color: var(--success, #2E9E5B); }
+
+/* Stacked choices in a confirm sheet (more than three options) */
+.btn-row.stacked { flex-direction: column; }
+.btn-row.stacked .btn { width: 100%; }
+
+/* ---- Install / add to home screen sheet ---- */
+.install-sheet { overflow-y: auto; }
+.install-sheet h3 { font-size: 24px; text-align: center; margin-bottom: 14px; }
+.install-sheet #install-desc { font-size: 16.5px; line-height: 1.55; color: var(--text); margin-bottom: 18px; }
+.install-sheet .install-main-btn { width: 100%; font-size: 19px; padding: 18px; font-weight: 800; margin-bottom: 18px; }
+.install-steps { border-top: 1px solid var(--border); padding-top: 14px; }
+.install-steps h4 { font-size: 15.5px; font-weight: 800; margin: 12px 0 4px; }
+.install-steps p { font-size: 15px; line-height: 1.5; color: var(--text-muted); }

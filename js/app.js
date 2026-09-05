@@ -1,4 +1,4 @@
-// Vernostka main app controller - verzia v18
+// Vernostka main app controller - verzia v19
 const App = {
   cards: [],
   categories: [],
@@ -31,6 +31,7 @@ const App = {
     this.bindDetailModal();
     this.bindFullscreenCode();
     this.bindConfirmModal();
+    this.bindInstallSheet();
 
     // Keep a pristine copy of the confirm sheet's button row so threeWayDialog() can
     // rebuild it after temporarily replacing it with a custom set of buttons.
@@ -512,12 +513,18 @@ const App = {
     // decodes instead of forcing the other phone to hunt for the right angle.
     const size = Math.max(280, Math.min(Math.floor(Math.min(window.innerWidth, window.innerHeight) - 24), 620));
     renderCode(container, frame, 'QR', { width: size, height: size, correctLevel: 'M' });
+    const wrap = document.getElementById('send-qr-progress-wrap');
     const progressEl = document.getElementById('send-qr-progress');
     if (this._bulkQrFrames.length > 1) {
-      progressEl.hidden = false;
+      wrap.hidden = false;
       progressEl.textContent = i18n.t('send_qr_progress', { current: this._bulkQrIndex + 1, total: this._bulkQrFrames.length });
+      this.renderProgressSegments(
+        document.getElementById('send-qr-bar'),
+        this._bulkQrFrames.length,
+        (i) => i <= this._bulkQrIndex + 1
+      );
     } else {
-      progressEl.hidden = true;
+      wrap.hidden = true;
     }
   },
 
@@ -1155,12 +1162,17 @@ const App = {
     }
     this._bulkReceiveBuffer[chunkInfo.index] = chunkInfo.chunk;
     const receivedCount = Object.keys(this._bulkReceiveBuffer).length;
-    let progress = i18n.t('scan_receiving_progress', { current: receivedCount, total: chunkInfo.total });
+    this.showScanProgress(i18n.t('scan_receiving_progress', { current: receivedCount, total: chunkInfo.total }));
+    this.renderProgressSegments(
+      document.getElementById('scan-progress-bar'),
+      chunkInfo.total,
+      (i) => !!this._bulkReceiveBuffer[i]
+    );
     // Naming the parts still missing lets the sender step to exactly those by hand.
     const missing = [];
     for (let i = 1; i <= chunkInfo.total; i++) if (!this._bulkReceiveBuffer[i]) missing.push(i);
-    if (missing.length && missing.length <= 8) progress += ' - ' + i18n.t('scan_receiving_missing', { list: missing.join(', ') });
-    this.showScanProgress(progress);
+    const sub = document.getElementById('scan-progress-sub');
+    if (sub) sub.textContent = missing.length && missing.length <= 10 ? i18n.t('scan_receiving_missing', { list: missing.join(', ') }) : '';
 
     if (receivedCount >= chunkInfo.total) {
       const parts = [];
@@ -1187,15 +1199,31 @@ const App = {
   },
 
   showScanProgress(text) {
+    const wrap = document.getElementById('scan-progress');
     const el = document.getElementById('scan-progress-hint');
-    if (!el) return;
-    el.hidden = false;
+    if (!el || !wrap) return;
+    wrap.hidden = false;
     el.textContent = text;
   },
 
   clearScanProgress() {
-    const el = document.getElementById('scan-progress-hint');
-    if (el) el.hidden = true;
+    const wrap = document.getElementById('scan-progress');
+    if (wrap) wrap.hidden = true;
+    const sub = document.getElementById('scan-progress-sub');
+    if (sub) sub.textContent = '';
+    const bar = document.getElementById('scan-progress-bar');
+    if (bar) bar.innerHTML = '';
+  },
+
+  // Draws one small block per QR code of the transfer: filled = already received.
+  renderProgressSegments(el, total, isDone) {
+    if (!el) return;
+    el.innerHTML = '';
+    for (let i = 1; i <= total; i++) {
+      const seg = document.createElement('span');
+      seg.className = 'progress-segment' + (isDone(i) ? ' filled' : '');
+      el.appendChild(seg);
+    }
   },
 
   // Builds and saves a local card from one shared/received compact card object.
@@ -1253,15 +1281,10 @@ const App = {
   // feature: offers to add the received card(s) as brand-new local cards.
   async importSharedCards(sharedList) {
     const count = sharedList.length;
-    const proceed = await this.confirmDialog(
-      i18n.t('receive_card_title'),
-      count === 1 ? i18n.t('receive_card_desc', { name: sharedList[0].n || '' }) : i18n.t('receive_cards_desc', { count }),
-      i18n.t('receive_card_add'),
-      i18n.t('cancel')
-    );
-    if (!proceed) { this.startScanning(); return; }
-
-    const strategy = await this.askImportCategoryStrategy();
+    // One sheet for the whole decision: how many cards arrived, where they should go, and a
+    // clear way out - instead of an "Add card?" question followed by a second menu.
+    const strategy = await this.askImportCategoryStrategy(count, sharedList);
+    if (!strategy || strategy === 'cancel') { this.startScanning(); return; }
     let fixedCategoryId = null;
     if (strategy === 'choose') {
       fixedCategoryId = await this.pickCategoryDialog();
@@ -1276,23 +1299,40 @@ const App = {
     this.closeEditModal();
     await this.renderCardsList();
     this.toast(count === 1 ? i18n.t('receive_card_added') : i18n.t('receive_cards_added', { count }));
+    await this.offerRemoveEmptyCategories();
     this.onDataChanged();
   },
 
   // Asks how the imported cards' categories should be handled: keep the same categorization
   // as on the sending phone (creating any missing category locally), put everything into one
   // chosen category, or leave them uncategorized.
-  async askImportCategoryStrategy() {
+  async askImportCategoryStrategy(count, sharedList) {
+    const title = count === 1
+      ? i18n.t('receive_card_title')
+      : i18n.t('receive_cards_title', { cards: this.cardsCountLabel(count) });
+    const desc = count === 1 && sharedList && sharedList[0]
+      ? i18n.t('receive_card_desc_one', { name: sharedList[0].n || i18n.t('untitled_card') })
+      : i18n.t('receive_cards_desc_many', { cards: this.cardsCountLabel(count) });
     const choice = await this.threeWayDialog(
-      i18n.t('import_category_strategy_title'),
-      i18n.t('import_category_strategy_desc'),
+      title,
+      desc,
       [
-        { label: i18n.t('import_category_keep'), value: 'keep', className: 'btn-secondary' },
+        { label: i18n.t('import_category_keep'), value: 'keep', className: 'btn-primary' },
         { label: i18n.t('import_category_choose'), value: 'choose', className: 'btn-secondary' },
-        { label: i18n.t('import_category_none'), value: 'none', className: 'btn-ghost' }
-      ]
+        { label: i18n.t('import_category_none'), value: 'none', className: 'btn-secondary' },
+        { label: i18n.t('receive_cancel_all'), value: 'cancel', className: 'btn-danger' }
+      ],
+      false,
+      true
     );
-    return choice || 'keep';
+    return choice || 'cancel';
+  },
+
+  // "1 karta" / "3 karty" / "79 kariet"
+  cardsCountLabel(count) {
+    if (count === 1) return i18n.t('cards_label_one', { count });
+    if (count >= 2 && count <= 4) return i18n.t('cards_label_few', { count });
+    return i18n.t('cards_label_many', { count });
   },
 
   // Lets the person pick one existing category (or create a new one) - reuses the bulk
@@ -1720,13 +1760,21 @@ const App = {
       }
     });
     document.getElementById('backup-now-btn').addEventListener('click', async () => {
-      if (Backup.hasActiveFolderPermission()) {
-        await Backup.writeBackupToFolder();
-      } else {
-        await Backup.exportToFile();
+      try {
+        if (Backup.hasActiveFolderPermission()) {
+          const name = await Backup.writeBackupToFolder();
+          this.updateBackupStatusUI();
+          await this.infoDialog(i18n.t('backup_saved_title'), i18n.t('backup_saved_folder', { file: name, folder: Backup.dirHandle.name }));
+        } else {
+          // No folder picked: save straight to the browser's download folder rather than
+          // opening a share sheet, so one tap really does produce a saved file.
+          const name = await Backup.downloadBackupFile();
+          this.updateBackupStatusUI();
+          await this.infoDialog(i18n.t('backup_saved_title'), i18n.t('backup_saved_downloads', { file: name }));
+        }
+      } catch (e) {
+        this.toast(i18n.t('error_generic'));
       }
-      this.updateBackupStatusUI();
-      this.toast(i18n.t('backup_now'));
     });
     document.getElementById('export-backup-btn').addEventListener('click', async () => {
       await Backup.exportToFile();
@@ -1909,6 +1957,32 @@ const App = {
     });
   },
 
+  // After importing (backup restore or QR transfer) the pre-created default categories are
+  // often left over with no cards in them. Offer to clear those out.
+  async offerRemoveEmptyCategories() {
+    await this.loadCategories();
+    const allCards = await DB.getAllCards();
+    const used = new Set();
+    allCards.forEach((c) => this.cardCategoryIds(c).forEach((id) => used.add(id)));
+    const empty = this.categories.filter((c) => !used.has(c.id));
+    if (empty.length === 0 || this.categories.length === empty.length && allCards.length === 0) return;
+    const names = empty.map((c) => this.categoryLabel(c)).join(', ');
+    const ok = await this.confirmDialog(
+      i18n.t('empty_cats_title'),
+      i18n.t('empty_cats_desc', { list: names }),
+      i18n.t('empty_cats_delete'),
+      i18n.t('empty_cats_keep')
+    );
+    if (!ok) return;
+    for (const cat of empty) await DB.deleteCategory(cat.id);
+    await this.loadCategories();
+    this.renderCategoryChips();
+    this.renderCategorySelect();
+    this.renderSettingsCategories();
+    await this.renderCardsList();
+    this.toast(i18n.t('empty_cats_done', { count: empty.length }));
+  },
+
   async handleImportPayload(payload) {
     const isEmpty = await DB.isEmpty();
     let mode = 'merge';
@@ -1925,6 +1999,7 @@ const App = {
     this.renderSettingsCategories();
     await this.renderCardsList();
     this.toast(i18n.t('restore_action'));
+    await this.offerRemoveEmptyCategories();
   },
 
   updateBackupStatusUI() {
@@ -1999,11 +2074,44 @@ const App = {
     if (isStandalone) return;
     const dismissed = await DB.getSetting('installPromptDismissed', false);
     if (dismissed) return;
-    setTimeout(() => {
-      this.showBanner(i18n.t('install_prompt_title'), i18n.t('install_prompt_desc') + ' ' + i18n.t('ios_install_steps'), [
-        { label: i18n.t('install_dismiss'), action: () => DB.setSetting('installPromptDismissed', true) }
-      ]);
-    }, 1200);
+    setTimeout(() => this.openInstallSheet(), 1200);
+  },
+
+  openInstallSheet() {
+    // Chrome/Android hands us the install event - then the sheet can open the real install
+    // dialog directly instead of describing where to find it in the browser menu.
+    document.getElementById('install-now-btn').hidden = !this._installEvent;
+    this.showModal('modal-install');
+  },
+
+  bindInstallSheet() {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      this._installEvent = e;
+      const btn = document.getElementById('install-now-btn');
+      if (btn && !document.getElementById('modal-install').hidden) btn.hidden = false;
+    });
+    window.addEventListener('appinstalled', () => {
+      this._installEvent = null;
+      this.hideModal('modal-install');
+      DB.setSetting('installPromptDismissed', true);
+    });
+    document.getElementById('install-now-btn').addEventListener('click', async () => {
+      if (!this._installEvent) return;
+      const evt = this._installEvent;
+      this._installEvent = null;
+      this.hideModal('modal-install');
+      try {
+        evt.prompt();
+        const res = await evt.userChoice;
+        if (res && res.outcome === 'accepted') await DB.setSetting('installPromptDismissed', true);
+      } catch (e) { /* ignore */ }
+    });
+    document.getElementById('install-later-btn').addEventListener('click', () => this.hideModal('modal-install'));
+    document.getElementById('install-dismiss-btn').addEventListener('click', async () => {
+      await DB.setSetting('installPromptDismissed', true);
+      this.hideModal('modal-install');
+    });
   },
 
   // ---------------- Generic UI helpers ----------------
@@ -2071,14 +2179,20 @@ const App = {
   // Generic 2-or-3-button sheet. buttons: [{label, value, className}]. Resolves with the
   // clicked button's value. Rebuilds the confirm sheet's default two buttons afterwards so
   // confirmDialog()/choiceDialog() keep working normally on subsequent calls.
-  threeWayDialog(title, desc, buttons, danger = false) {
+  infoDialog(title, desc) {
+    return this.threeWayDialog(title, desc, [{ label: i18n.t('ok'), value: 'ok', className: 'btn-primary' }]);
+  },
+
+  threeWayDialog(title, desc, buttons, danger = false, big = danger) {
     return new Promise((resolve) => {
       document.getElementById('confirm-title').textContent = title;
       document.getElementById('confirm-desc').textContent = desc;
-      document.querySelector('#modal-confirm .modal-sheet').classList.toggle('big', danger);
+      document.querySelector('#modal-confirm .modal-sheet').classList.toggle('big', !!big);
       document.getElementById('confirm-warning-icon').hidden = !danger;
       document.getElementById('confirm-warning').hidden = !danger;
       const btnRow = document.querySelector('#modal-confirm .btn-row');
+      // More than three choices never fit side by side on a phone - stack them.
+      btnRow.classList.toggle('stacked', buttons.length > 3);
       btnRow.innerHTML = '';
       buttons.forEach((b) => {
         const btn = document.createElement('button');
@@ -2088,6 +2202,7 @@ const App = {
         btn.addEventListener('click', () => {
           if (b.disabled) return;
           this.hideModal('modal-confirm');
+          btnRow.classList.remove('stacked');
           btnRow.innerHTML = this._confirmBtnRowTemplate;
           resolve(b.value);
         });
