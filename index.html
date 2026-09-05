@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Vernostka - verzia v20 -->
+<!-- Vernostka - verzia v21 -->
 <html lang="sk">
 <head>
 <meta charset="UTF-8">
@@ -91,6 +91,12 @@
           <button data-value="dark" data-i18n="theme_dark">Tmavy</button>
           <button data-value="system" data-i18n="theme_system">Podla systemu</button>
         </div>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="settings_install">Instalacia na plochu</h3>
+        <p id="install-status" class="hint"></p>
+        <button id="settings-install-btn" class="btn btn-secondary" data-i18n="settings_install_button">Instalovat aplikaciu</button>
       </div>
 
       <div class="settings-group">
@@ -366,14 +372,14 @@
       <div class="fs-store-name" data-i18n="send_title">Odoslat karty</div>
       <div class="fs-header-spacer"></div>
     </div>
-    <div id="send-qr-progress-wrap" class="send-qr-progress-wrap" hidden>
-      <p id="send-qr-progress" class="transfer-progress-text"></p>
-      <div id="send-qr-bar" class="progress-segments"></div>
-    </div>
     <div class="fs-code-stage">
       <div id="send-qr-container" class="send-qr-container"></div>
     </div>
     <div class="send-qr-controls">
+      <div id="send-qr-progress-wrap" class="send-qr-progress-wrap" hidden>
+        <p id="send-qr-progress" class="transfer-progress-text"></p>
+        <div id="send-qr-bar" class="progress-segments"></div>
+      </div>
       <p class="hint center" data-i18n="send_qr_hint">Druhy telefon nech otvori Skenovat.</p>
       <div id="send-qr-nav" class="send-qr-nav" hidden>
         <button id="send-qr-prev-btn" class="btn btn-secondary small" aria-label="Predchadzajuci">&#9664;</button>

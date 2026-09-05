@@ -618,8 +618,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 .card-row.long-pressing { transform: scale(0.975); border-color: var(--accent); transition: transform 120ms ease; }
 .longpress-ring {
   position: fixed;
-  width: 124px; height: 124px;
-  margin-left: -62px; margin-top: -62px;
+  width: 176px; height: 176px;
+  margin-left: -88px; margin-top: -88px;
   pointer-events: none;
   z-index: 60;
 }
@@ -714,16 +714,16 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
    row stretched the blocks of the first (full) row into rectangles. */
 .progress-segments {
   display: grid;
-  grid-template-columns: repeat(15, 1fr);
-  gap: 4px;
+  grid-template-columns: repeat(20, 1fr);
+  gap: 3px;
   margin: 0 auto 6px;
-  max-width: 420px;
+  max-width: 440px;
 }
 .progress-segment {
   width: 100%;
   aspect-ratio: 1 / 1;
-  max-height: 22px;
-  border-radius: 3px;
+  max-height: 16px;
+  border-radius: 2px;
   background: rgba(120,130,140,0.28);
   border: 1px solid rgba(120,130,140,0.35);
 }
@@ -743,5 +743,18 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 .install-steps p { font-size: 15px; line-height: 1.5; color: var(--text-muted); }
 
 /* Sending screen: the frame counter sits above the code so it is always visible */
-.send-qr-progress-wrap { flex-shrink: 0; padding: 6px 16px 2px; background: #fff; }
+.send-qr-progress-wrap { flex-shrink: 0; padding: 2px 8px 4px; background: #fff; }
 .send-qr-progress-wrap .transfer-progress-text { color: #111; margin-bottom: 6px; }
+
+/* Hold-to-confirm button: a bar fills up while it is held down */
+.btn.btn-hold { position: relative; overflow: hidden; touch-action: none; }
+.btn.btn-hold::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 0;
+  background: rgba(255,255,255,0.32);
+  pointer-events: none;
+}
+.btn.btn-hold.holding::after { animation: hold-fill var(--hold-duration, 1400ms) linear forwards; }
+@keyframes hold-fill { to { width: 100%; } }

@@ -1,4 +1,4 @@
-// Vernostka main app controller - verzia v20
+// Vernostka main app controller - verzia v21
 
 // Chrome fires beforeinstallprompt very early - often before the app has finished starting
 // up - and only once. Catch it here, at script level, so the "Install now" button in the
@@ -49,6 +49,7 @@ const App = {
 
     this.applyVibrationToDom();
     this.applyGpsToDom();
+    this.updateInstallStatusUI();
     this.renderCategoryChips();
     this.renderCategorySelect();
     this.renderSettingsCategories();
@@ -674,6 +675,53 @@ const App = {
   },
 
   LONG_PRESS_MS: 550,
+  HOLD_CONFIRM_MS: 1400,
+
+  // Draws the filling ring at the given screen position and returns a function that removes
+  // it again. Shared by the long press on a card and hold-to-confirm buttons.
+  showPressRing(x, y, ms) {
+    const ring = document.createElement('div');
+    ring.className = 'longpress-ring';
+    ring.style.left = x + 'px';
+    ring.style.top = y + 'px';
+    ring.style.setProperty('--lp-duration', ms + 'ms');
+    ring.innerHTML = '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="17"></circle></svg>';
+    document.body.appendChild(ring);
+    return () => ring.remove();
+  },
+
+  // Makes a button fire only after being held down, with the same ring as a long press -
+  // used for destructive actions that must not happen on a stray tap.
+  attachHoldToConfirm(btn, onComplete, ms = this.HOLD_CONFIRM_MS) {
+    let timer = null;
+    let removeRing = null;
+    let startX = 0, startY = 0;
+    const cancel = () => {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (removeRing) { removeRing(); removeRing = null; }
+      btn.classList.remove('holding');
+    };
+    const start = (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      cancel();
+      startX = e.clientX; startY = e.clientY;
+      removeRing = this.showPressRing(e.clientX, e.clientY, ms);
+      btn.classList.add('holding');
+      btn.style.setProperty('--hold-duration', ms + 'ms');
+      timer = setTimeout(() => {
+        cancel();
+        this.buzz(40);
+        onComplete();
+      }, ms);
+    };
+    btn.addEventListener('pointerdown', start);
+    btn.addEventListener('pointermove', (e) => {
+      if (timer && (Math.abs(e.clientX - startX) > 12 || Math.abs(e.clientY - startY) > 12)) cancel();
+    });
+    btn.addEventListener('pointerup', cancel);
+    btn.addEventListener('pointercancel', cancel);
+    btn.addEventListener('pointerleave', cancel);
+  },
 
   // Holding a card switches to multi-select mode with that card already ticked. A ring
   // fills up around the finger while it is held, so it is visible that something is about
@@ -696,13 +744,7 @@ const App = {
       cancel();
       fired = false;
       startX = e.clientX; startY = e.clientY;
-      ring = document.createElement('div');
-      ring.className = 'longpress-ring';
-      ring.style.left = e.clientX + 'px';
-      ring.style.top = e.clientY + 'px';
-      ring.style.setProperty('--lp-duration', this.LONG_PRESS_MS + 'ms');
-      ring.innerHTML = '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="17"></circle></svg>';
-      document.body.appendChild(ring);
+      ring = { remove: this.showPressRing(e.clientX, e.clientY, this.LONG_PRESS_MS) };
       row.classList.add('long-pressing');
       timer = setTimeout(() => {
         fired = true;
@@ -1259,8 +1301,11 @@ const App = {
     if (!el) return;
     // At most 15 blocks per row, and every row uses the same number of columns, so the
     // blocks stay square instead of being stretched into rectangles on the first row.
-    const perRow = Math.min(total, 15);
+    const perRow = Math.min(total, 20);
     el.style.gridTemplateColumns = `repeat(${perRow}, 1fr)`;
+    // Cap the grid width to the number of columns so the blocks stay square instead of
+    // being stretched wide when there are only a few of them.
+    el.style.maxWidth = (perRow * 19) + 'px';
     el.innerHTML = '';
     for (let i = 1; i <= total; i++) {
       const seg = document.createElement('span');
@@ -1770,6 +1815,8 @@ const App = {
         this.applyTheme();
       });
     });
+    document.getElementById('settings-install-btn').addEventListener('click', () => this.openInstallSheet());
+
     document.querySelectorAll('#gps-segmented button').forEach((btn) => {
       btn.addEventListener('click', async () => {
         this.gpsEnabled = btn.dataset.value === 'on';
@@ -1873,7 +1920,7 @@ const App = {
         [
           { label: i18n.t('cancel'), value: 'cancel', className: 'btn-ghost' },
           { label: i18n.t('backup_then_delete'), value: 'backup', className: 'btn-secondary' },
-          { label: i18n.t('delete_without_backup'), value: 'delete', className: 'btn-danger' }
+          { label: i18n.t('delete_without_backup'), value: 'delete', className: 'btn-danger', hold: true }
         ],
         true
       );
@@ -1883,8 +1930,25 @@ const App = {
         else await Backup.exportToFile();
         this.updateBackupStatusUI();
       }
+      // Categories are a separate decision - some people want to keep their own structure
+      // and start filling it again with new cards.
+      const alsoCategories = await this.confirmDialog(
+        i18n.t('reset_categories_title'),
+        i18n.t('reset_categories_desc'),
+        i18n.t('reset_categories_delete'),
+        i18n.t('reset_categories_keep')
+      );
       await DB.replaceAllCards([]);
       await DB.replaceAllHistory([]);
+      if (alsoCategories) {
+        await DB.replaceAllCategories([]);
+        // Do not let the built-in categories reappear on the next start.
+        await DB.setSetting('defaultCategoriesSeeded', true);
+        await this.loadCategories();
+        this.renderCategoryChips();
+        this.renderCategorySelect();
+      }
+      this.renderSettingsCategories();
       await this.renderCardsList();
       this.toast(i18n.t('settings_reset'));
     });
@@ -2148,6 +2212,27 @@ const App = {
     setTimeout(() => this.openInstallSheet(), 1200);
   },
 
+  // Shows whether the app already runs as an installed app, and when it was installed (the
+  // browser does not report that, so the date is the moment this app saw it happen).
+  async updateInstallStatusUI() {
+    const statusEl = document.getElementById('install-status');
+    const btn = document.getElementById('settings-install-btn');
+    if (!statusEl || !btn) return;
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    let installedAt = await DB.getSetting('installedAt', null);
+    if (standalone && !installedAt) {
+      installedAt = Date.now();
+      await DB.setSetting('installedAt', installedAt);
+    }
+    if (standalone) {
+      statusEl.textContent = i18n.t('install_status_installed', { date: this.formatLastUsed(installedAt) });
+      btn.hidden = true;
+    } else {
+      statusEl.textContent = deferredInstallEvent ? i18n.t('install_status_ready') : i18n.t('install_status_manual');
+      btn.hidden = false;
+    }
+  },
+
   openInstallSheet() {
     // Chrome/Android hands us the install event - then the sheet can open the real install
     // dialog directly instead of describing where to find it in the browser menu.
@@ -2159,9 +2244,12 @@ const App = {
     window.addEventListener('vernostka-install-available', () => {
       const btn = document.getElementById('install-now-btn');
       if (btn) btn.hidden = false;
+      this.updateInstallStatusUI();
     });
-    window.addEventListener('appinstalled', () => {
+    window.addEventListener('appinstalled', async () => {
       deferredInstallEvent = null;
+      await DB.setSetting('installedAt', Date.now());
+      this.updateInstallStatusUI();
       this.hideModal('modal-install');
       DB.setSetting('installPromptDismissed', true);
     });
@@ -2265,16 +2353,24 @@ const App = {
       btnRow.innerHTML = '';
       buttons.forEach((b) => {
         const btn = document.createElement('button');
-        btn.className = 'btn ' + (b.className || 'btn-ghost') + (b.disabled ? ' btn-struck' : '');
-        btn.textContent = b.label;
+        btn.className = 'btn ' + (b.className || 'btn-ghost') + (b.disabled ? ' btn-struck' : '') + (b.hold ? ' btn-hold' : '');
+        btn.textContent = b.hold ? b.label + ' (' + i18n.t('hold_to_confirm') + ')' : b.label;
         if (b.disabled) btn.disabled = true;
-        btn.addEventListener('click', () => {
+        const choose = () => {
           if (b.disabled) return;
           this.hideModal('modal-confirm');
           btnRow.classList.remove('stacked');
           btnRow.innerHTML = this._confirmBtnRowTemplate;
           resolve(b.value);
-        });
+        };
+        if (b.hold) {
+          // Destructive choice: it only fires after being held down, with the ring filling
+          // up around the finger.
+          this.attachHoldToConfirm(btn, choose);
+          btn.addEventListener('click', (e) => e.preventDefault());
+        } else {
+          btn.addEventListener('click', choose);
+        }
         btnRow.appendChild(btn);
       });
       this.showModal('modal-confirm');
