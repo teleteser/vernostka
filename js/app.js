@@ -1,4 +1,4 @@
-// Vernostka main app controller
+// Vernostka main app controller - verzia v15
 const App = {
   cards: [],
   categories: [],
@@ -201,6 +201,11 @@ const App = {
     document.getElementById('selection-assign-btn').addEventListener('click', () => this.openBulkCategoryAssign());
     document.getElementById('selection-send-btn').addEventListener('click', () => this.openSendMethodDialog());
     document.getElementById('bulk-category-cancel-btn').addEventListener('click', () => this.hideModal('modal-bulk-category'));
+    // Always-available "create new category" action inside the assign-category sheet, so a
+    // new category can be made even when none exist yet.
+    document.getElementById('bulk-category-new-btn').addEventListener('click', () => {
+      if (this._bulkCategoryNewHandler) this._bulkCategoryNewHandler();
+    });
     document.getElementById('send-method-cancel-btn').addEventListener('click', () => this.hideModal('modal-send-method'));
     document.getElementById('send-via-file-btn').addEventListener('click', () => this.sendSelectedViaFile());
     document.getElementById('send-via-qr-btn').addEventListener('click', () => this.sendSelectedViaQr());
@@ -249,7 +254,32 @@ const App = {
       chip.addEventListener('click', () => this.applyBulkCategory(cat.id));
       listEl.appendChild(chip);
     });
+    if (this.categories.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'hint';
+      empty.textContent = i18n.t('bulk_assign_empty');
+      listEl.appendChild(empty);
+    }
+    this._bulkCategoryNewHandler = async () => {
+      const newId = await this.createCategoryPrompt();
+      if (newId) await this.applyBulkCategory(newId);
+    };
     this.showModal('modal-bulk-category');
+  },
+
+  // Asks for a new category name and stores it. Returns the new category id, or null when
+  // the person cancelled or left the name empty.
+  async createCategoryPrompt() {
+    const name = prompt(i18n.t('category_new_placeholder'));
+    if (!name || !name.trim()) return null;
+    const nextOrder = this.categories.reduce((max, c) => Math.max(max, c.order || 0), -1) + 1;
+    const newCat = { id: DB.uid(), builtin: null, name: name.trim(), order: nextOrder };
+    await DB.putCategory(newCat);
+    await this.loadCategories();
+    this.renderSettingsCategories();
+    this.renderCategoryChips();
+    this.renderCategorySelect();
+    return newCat.id;
   },
 
   async applyBulkCategory(categoryId) {
@@ -1054,20 +1084,16 @@ const App = {
         chip.addEventListener('click', () => finish(cat.id));
         listEl.appendChild(chip);
       });
-      const newChip = document.createElement('button');
-      newChip.type = 'button';
-      newChip.className = 'chip';
-      newChip.textContent = i18n.t('category_add_new');
-      newChip.addEventListener('click', async () => {
-        const name = prompt(i18n.t('category_new_placeholder'));
-        if (!name || !name.trim()) return;
-        const nextOrder = this.categories.reduce((max, c) => Math.max(max, c.order || 0), -1) + 1;
-        const newCat = { id: DB.uid(), builtin: null, name: name.trim(), order: nextOrder };
-        await DB.putCategory(newCat);
-        await this.loadCategories();
-        finish(newCat.id);
-      });
-      listEl.appendChild(newChip);
+      if (this.categories.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'hint';
+        empty.textContent = i18n.t('bulk_assign_empty');
+        listEl.appendChild(empty);
+      }
+      this._bulkCategoryNewHandler = async () => {
+        const newId = await this.createCategoryPrompt();
+        if (newId) finish(newId);
+      };
       document.getElementById('bulk-category-cancel-btn').addEventListener('click', () => finish(null), { once: true });
       this.showModal('modal-bulk-category');
     });
