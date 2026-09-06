@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Vernostka - verzia v25 -->
+<!-- Vernostka - verzia v26 -->
 <html lang="sk">
 <head>
 <meta charset="UTF-8">
@@ -164,6 +164,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><path d="M14 14h3v3h-3zM19 19h2v2h-2zM14 19h2v2h-2zM19 14h2v2h-2z" fill="currentColor"/></svg>
           <span data-i18n="send_all_qr">Prenos vsetkych kariet cez QR</span>
         </button>
+        <div class="btn-spacer"></div>
         <button id="export-backup-btn" class="btn btn-accent" data-i18n="backup_export_manual">Exportovat zalohu (subor)</button>
         <input type="file" id="import-file-input" accept="application/json,.json,.txt,text/plain" hidden>
       </div>
@@ -185,7 +186,7 @@
 
       <div class="settings-group">
         <h3 data-i18n="settings_about">O appke</h3>
-        <p class="app-version">Vernostka_v25 &copy; 06.09.2026 10:36 Vojta</p>
+        <p class="app-version">Vernostka_v26 &copy; 06.09.2026 13:51 Vojta</p>
         <p class="hint">Vernostka - offline sprava vernostnych kariet. Ziadny ucet, ziadny cloud, ziadne sledovanie.</p>
       </div>
     </div>
@@ -255,7 +256,7 @@
       <div id="manual-pane" class="capture-pane" hidden>
         <div class="code-preview" id="manual-code-preview"></div>
         <label class="field-label" data-i18n="card_code_label">Cislo / kod karty</label>
-        <input type="text" id="field-code" name="loyalty-code-manual" autocomplete="new-password" autocorrect="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-i18n-placeholder="card_code_placeholder" placeholder="Naskenuj alebo zadaj cislo">
+        <input type="text" id="field-code" name="vk-f2" readonly autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-form-type="other" data-i18n-placeholder="card_code_placeholder" placeholder="Naskenuj alebo zadaj cislo">
         <label class="field-label" data-i18n="code_type_label">Typ kodu</label>
         <select id="field-code-type"></select>
       </div>
@@ -264,7 +265,7 @@
         <label class="field-label" data-i18n="store_name_label">Nazov obchodu</label>
         <div class="store-name-row">
           <div id="store-logo-preview" class="store-logo-preview"></div>
-          <input type="text" id="field-store-name" name="vk-f1" autocomplete="one-time-code" autocorrect="off" autocapitalize="words" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-i18n-placeholder="store_name_placeholder" placeholder="napr. Lidl">
+          <input type="text" id="field-store-name" name="vk-f1" readonly autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-form-type="other" data-i18n-placeholder="store_name_placeholder" placeholder="napr. Lidl">
         </div>
         <div id="store-suggestions" class="store-suggestions"></div>
 
@@ -476,10 +477,17 @@
   <!-- ===================== RESTORE ANIMATION ===================== -->
   <div id="restore-overlay" class="restore-overlay" hidden>
     <div class="restore-card">
-      <div class="restore-icon">
+      <div class="restore-icon" id="restore-icon-restore">
         <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
           <path d="M4 12a8 8 0 1 1 2.3 5.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           <path d="M4 20v-5h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="restore-icon trash-icon" id="restore-icon-trash" hidden>
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+          <path class="trash-lid" d="M3 6.5h18M9 6.5V4.5h6v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M5.5 6.5l1 14h11l1-14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path class="trash-item" d="M10 10v7M14 10v7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </svg>
       </div>
       <p id="restore-overlay-text" data-i18n="restore_progress">Obnovujem data zo zalohy...</p>

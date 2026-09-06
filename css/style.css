@@ -835,10 +835,17 @@ body.modal-open #app { overflow: hidden; }
 }
 
 /* Highlight a settings group jumped to from elsewhere */
-.settings-flash { animation: settings-flash 2.4s ease; border-radius: 12px; }
+/* Steady red frame for 2 s, then three slower blinks, then a slow fade out. */
+.settings-flash { animation: settings-flash 5s ease-out; border-radius: 12px; }
 @keyframes settings-flash {
-  0%, 22%, 44%, 66%, 100% { box-shadow: 0 0 0 0 rgba(211,66,62,0); }
-  11%, 33%, 55% { box-shadow: 0 0 0 4px rgba(211,66,62,0.95); }
+  0%, 40% { box-shadow: 0 0 0 4px rgba(211,66,62,0.95); }
+  48% { box-shadow: 0 0 0 0 rgba(211,66,62,0); }
+  56% { box-shadow: 0 0 0 4px rgba(211,66,62,0.95); }
+  64% { box-shadow: 0 0 0 0 rgba(211,66,62,0); }
+  72% { box-shadow: 0 0 0 4px rgba(211,66,62,0.95); }
+  80% { box-shadow: 0 0 0 0 rgba(211,66,62,0); }
+  88% { box-shadow: 0 0 0 4px rgba(211,66,62,0.55); }
+  100% { box-shadow: 0 0 0 6px rgba(211,66,62,0); }
 }
 
 /* Checkbox row in settings */
@@ -919,3 +926,24 @@ body.modal-open #app { overflow: hidden; }
 .btn-blue { background: var(--primary); color: #fff; border: 1px solid var(--primary); }
 [data-theme="dark"] .btn-blue { background: var(--primary-light); border-color: var(--primary-light); }
 .btn-qr-green { background: linear-gradient(135deg, #2E9E5B, #1f7a45); box-shadow: 0 4px 14px rgba(46,158,91,0.32); }
+
+/* Space between the QR transfer and the export button */
+.btn-spacer { height: 14px; }
+
+/* Emptying the trash: lid tips over, contents drop out */
+.overlay-trash .restore-bar-fill { background: linear-gradient(90deg, #d3423e, #8e2b28); }
+.trash-icon { color: var(--danger); }
+.trash-icon svg { animation: none; }
+.trash-icon .trash-lid { transform-origin: 20% 26%; animation: trash-lid 1.4s ease-in-out forwards; }
+.trash-icon .trash-item { animation: trash-item 1.4s ease-in forwards; }
+@keyframes trash-lid {
+  0% { transform: rotate(0) translateY(0); }
+  25% { transform: rotate(-24deg) translate(-2px, -3px); }
+  75% { transform: rotate(-24deg) translate(-2px, -3px); }
+  100% { transform: rotate(0) translateY(0); }
+}
+@keyframes trash-item {
+  0% { opacity: 1; transform: translateY(0); }
+  55% { opacity: 1; transform: translateY(-9px); }
+  100% { opacity: 0; transform: translateY(-22px) scale(0.7); }
+}

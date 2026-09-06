@@ -1,4 +1,4 @@
-// Vernostka main app controller - verzia v25
+// Vernostka main app controller - verzia v26
 
 // Chrome fires beforeinstallprompt very early - often before the app has finished starting
 // up - and only once. Catch it here, at script level, so the "Install now" button in the
@@ -37,6 +37,7 @@ const App = {
     this.bindCardsView();
     this.bindSettingsView();
     this.bindEditModal();
+    this.bindNoAutofillFields();
     this.bindMapModal();
     this.bindDetailModal();
     this.bindFullscreenCode();
@@ -413,6 +414,10 @@ const App = {
       group.classList.remove('settings-flash');
       void group.offsetWidth;
       group.classList.add('settings-flash');
+      // Take the class off again once the animation is done - otherwise the highlight
+      // replayed every time the settings screen was opened afterwards.
+      clearTimeout(this._settingsFlashTimer);
+      this._settingsFlashTimer = setTimeout(() => group.classList.remove('settings-flash'), 5200);
     });
     document.getElementById('fab-add').addEventListener('click', () => this.openAddCard());
     document.getElementById('empty-add-btn').addEventListener('click', () => this.openAddCard());
@@ -1048,6 +1053,26 @@ const App = {
   escapeHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; },
 
   // ---------------- Add / edit card modal ----------------
+  // Browsers offer "autofill contact / passwords / addresses" for any focusable text field.
+  // Keeping the field read-only until it is actually tapped stops that menu from appearing
+  // while still opening the keyboard normally.
+  bindNoAutofillFields() {
+    ['field-store-name', 'field-code'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const unlock = () => {
+        if (!el.hasAttribute('readonly')) return;
+        el.removeAttribute('readonly');
+        el.focus();
+      };
+      el.addEventListener('pointerdown', unlock);
+      el.addEventListener('touchstart', unlock, { passive: true });
+      el.addEventListener('focus', unlock);
+      // Lock it again when leaving, so the next visit behaves the same way.
+      el.addEventListener('blur', () => el.setAttribute('readonly', 'readonly'));
+    });
+  },
+
   bindEditModal() {
     document.getElementById('edit-close-btn').addEventListener('click', () => this.closeEditModal());
     document.getElementById('edit-save-btn').addEventListener('click', () => this.saveEditingCard());
@@ -1281,6 +1306,8 @@ const App = {
   },
 
   renderLogoPreview() {
+    // The form may already be closed when a late callback (logo lookup, blur) arrives.
+    if (!this.editingCard) return;
     const el = document.getElementById('store-logo-preview');
     if (this.editingCard.logo) {
       el.style.background = '';
@@ -1335,9 +1362,10 @@ const App = {
 
   async tryFetchLogo() {
     document.getElementById('store-suggestions').innerHTML = '';
-    if (this.editingCard.logo || !this.editingCard.storeName) return;
+    if (!this.editingCard || this.editingCard.logo || !this.editingCard.storeName) return;
     const preset = STORE_PRESETS.find((s) => s.name.toLowerCase() === this.editingCard.storeName.trim().toLowerCase());
     const dataUrl = await LogoLookup.fetchLogoAsDataUrl(this.editingCard.storeName, preset ? preset.domain : null);
+    if (!this.editingCard) return;   // the form was closed while the logo was being fetched
     if (dataUrl) {
       this.editingCard.logo = dataUrl;
       this.renderLogoPreview();
@@ -2067,8 +2095,13 @@ const App = {
         true
       );
       if (choice !== 'empty') return;
+      this.showRestoreOverlay(i18n.t('trash_emptying'), 'trash');
+      const startedAt = Date.now();
       await DB.clearTrash();
       await this.renderTrash();
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 1400) await new Promise((r) => setTimeout(r, 1400 - elapsed));
+      this.hideRestoreOverlay();
       this.toast(i18n.t('trash_emptied'));
     });
     document.getElementById('trash-restore-all-btn').addEventListener('click', async () => {
@@ -2436,10 +2469,13 @@ const App = {
 
   // Short "restoring your data" animation, so a restore feels like something happened
   // instead of the screen simply blinking.
-  showRestoreOverlay(text) {
+  showRestoreOverlay(text, mode) {
     const el = document.getElementById('restore-overlay');
     if (!el) return;
     document.getElementById('restore-overlay-text').textContent = text || i18n.t('restore_progress');
+    document.getElementById('restore-icon-restore').hidden = mode === 'trash';
+    document.getElementById('restore-icon-trash').hidden = mode !== 'trash';
+    el.classList.toggle('overlay-trash', mode === 'trash');
     const bar = document.getElementById('restore-overlay-bar');
     bar.style.animation = 'none';
     void bar.offsetWidth;
