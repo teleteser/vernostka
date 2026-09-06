@@ -1,4 +1,4 @@
-// Vernostka main app controller - verzia v28
+// Vernostka main app controller - verzia v30
 
 // Chrome fires beforeinstallprompt very early - often before the app has finished starting
 // up - and only once. Catch it here, at script level, so the "Install now" button in the
@@ -2657,15 +2657,35 @@ const App = {
       statusEl.textContent = i18n.t('install_status_installed', { date: this.formatLastUsed(installedAt) });
       btn.hidden = true;
     } else {
-      statusEl.textContent = deferredInstallEvent ? i18n.t('install_status_ready') : i18n.t('install_status_manual');
+      if (this.isIOS()) {
+        statusEl.textContent = this.isRealSafari() ? i18n.t('install_status_ios') : i18n.t('install_status_ios_other');
+      } else {
+        statusEl.textContent = deferredInstallEvent ? i18n.t('install_status_ready') : i18n.t('install_status_manual');
+      }
       btn.hidden = false;
     }
+  },
+
+  // On iPhone "Add to Home Screen" exists only in Safari itself - not in Chrome/Firefox for
+  // iOS and not in the browser embedded in another app. Detect that and say so, because
+  // otherwise the person keeps looking for a menu item that cannot be there.
+  isIOS() {
+    const ua = navigator.userAgent;
+    return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  },
+
+  isRealSafari() {
+    const ua = navigator.userAgent;
+    if (/CriOS|FxiOS|EdgiOS|OPiOS|YaBrowser|DuckDuckGo|GSA/.test(ua)) return false;   // other iOS browsers
+    if (/FBAN|FBAV|Instagram|Line|Twitter|WhatsApp|MicroMessenger|Snapchat/.test(ua)) return false; // in-app browsers
+    return /Safari/.test(ua);
   },
 
   openInstallSheet() {
     // Chrome/Android hands us the install event - then the sheet can open the real install
     // dialog directly instead of describing where to find it in the browser menu.
     document.getElementById('install-now-btn').hidden = !deferredInstallEvent;
+    document.getElementById('install-ios-warning').hidden = !(this.isIOS() && !this.isRealSafari());
     this.showModal('modal-install');
   },
 
@@ -2692,6 +2712,15 @@ const App = {
         const res = await evt.userChoice;
         if (res && res.outcome === 'accepted') await DB.setSetting('installPromptDismissed', true);
       } catch (e) { /* ignore */ }
+    });
+    document.getElementById('install-copy-url').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(this.APP_URL);
+        this.toast(i18n.t('install_url_copied'));
+      } catch (e) {
+        // Clipboard blocked (older iOS, no permission) - show the address to copy by hand.
+        this.infoDialog(i18n.t('install_copy_url'), this.APP_URL, 20000);
+      }
     });
     document.getElementById('install-later-btn').addEventListener('click', () => this.hideModal('modal-install'));
     document.getElementById('install-dismiss-btn').addEventListener('click', async () => {

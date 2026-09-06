@@ -298,7 +298,7 @@ const Backup = {
       try {
         const file = new File([blob], shareFilename, { type: 'text/plain' });
         if (navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: 'Vernostka zaloha' });
+          await navigator.share({ files: [file], title: 'Vernostka záloha' });
           await DB.setSetting('lastBackupAt', Date.now());
           return shareFilename;
         }

@@ -965,3 +965,16 @@ body.modal-open #app { overflow: hidden; }
 .app-qr { background: #fff; border-radius: 14px; padding: 12px; display: flex; justify-content: center; }
 .app-qr canvas, .app-qr img { width: 100%; height: auto; max-width: 420px; }
 .app-qr-link { display: inline-block; margin-top: 10px; font-size: 14px; font-weight: 700; color: var(--primary-light); word-break: break-all; }
+
+/* iPhone install help */
+.install-list { margin: 6px 0 8px 20px; padding: 0; }
+.install-list li { font-size: 15px; line-height: 1.5; color: var(--text-muted); margin-bottom: 6px; }
+.install-warning {
+  border: 2px solid var(--danger);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  background: rgba(211,66,62,0.08);
+}
+.install-warning strong { display: block; color: var(--danger); font-size: 15.5px; margin-bottom: 6px; }
+.install-warning p { font-size: 14.5px; line-height: 1.45; margin-bottom: 10px; }

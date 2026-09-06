@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<!-- Vernostka - verzia v28 -->
+<!-- Vernostka - verzia v30 -->
 <html lang="sk">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>Vernostka</title>
-<meta name="description" content="Offline sprava vernostnych kariet">
+<meta name="description" content="Offline správa vernostných kariet">
 <meta name="theme-color" content="#1E3A5F">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
@@ -29,7 +29,7 @@
     <div class="search-row">
       <div class="search-box">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        <input type="text" id="search-input" inputmode="search" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" data-i18n-placeholder="search_placeholder" placeholder="Hladat kartu...">
+        <input type="text" id="search-input" inputmode="search" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" data-i18n-placeholder="search_placeholder" placeholder="Hľadať kartu…">
         <button id="search-clear-btn" class="search-clear-btn" aria-label="X" hidden>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>
         </button>
@@ -43,23 +43,23 @@
       </button>
     </div>
 
-    <button id="search-scope-note" class="search-scope-note" data-i18n="search_scope_note" hidden>Hlada sa vo vsetkych kartach.</button>
+    <button id="search-scope-note" class="search-scope-note" data-i18n="search_scope_note" hidden>Hľadá sa vo všetkých kartách, nielen vo zvolenej kategórii.</button>
     <div id="category-chips" class="chip-row"></div>
 
     <div id="cards-list" class="cards-list"></div>
 
     <div id="selection-bar" class="selection-bar" hidden>
       <div class="selection-bar-title">
-        <span data-i18n="selection_count_label">Vybrany pocet:</span>
+        <span data-i18n="selection_count_label">Vybraný počet:</span>
         <strong id="selection-count">0</strong>
       </div>
       <div class="selection-bar-row">
-        <button id="selection-select-all-btn" class="btn btn-light" data-i18n="select_all_visible">Vybrat vsetky</button>
-        <button id="selection-cancel-btn" class="btn btn-danger" data-i18n="cancel">Zrusit</button>
+        <button id="selection-select-all-btn" class="btn btn-light" data-i18n="select_all_visible">Vybrať všetky</button>
+        <button id="selection-cancel-btn" class="btn btn-danger" data-i18n="cancel">Zrušiť</button>
       </div>
       <div class="selection-bar-row">
-        <button id="selection-assign-btn" class="btn btn-accent" data-i18n="bulk_assign_button">Priradit kategoriu</button>
-        <button id="selection-send-btn" class="btn btn-success" data-i18n="send_button">Zdielat</button>
+        <button id="selection-assign-btn" class="btn btn-accent" data-i18n="bulk_assign_button">Priradiť kategóriu</button>
+        <button id="selection-send-btn" class="btn btn-success" data-i18n="send_button">Zdieľať</button>
       </div>
     </div>
 
@@ -68,11 +68,11 @@
         <svg width="88" height="88" viewBox="0 0 88 88" fill="none"><rect x="8" y="24" width="72" height="46" rx="8" fill="#1E3A5F"/><rect x="8" y="34" width="72" height="10" fill="#FF7A45"/><circle cx="24" cy="58" r="4" fill="#fff"/><circle cx="36" cy="58" r="4" fill="#fff"/></svg>
       </div>
       <h2 data-i18n="empty_title">Vitaj vo Vernostke</h2>
-      <p data-i18n="empty_desc">Tu najdes vsetky svoje vernostne karty na jednom mieste.</p>
-      <button id="empty-add-btn" class="btn btn-primary" data-i18n="add_first_card">Pridat prvu kartu</button>
+      <p data-i18n="empty_desc">Tu nájdeš všetky svoje vernostné karty na jednom mieste, fungujú aj offline.</p>
+      <button id="empty-add-btn" class="btn btn-primary" data-i18n="add_first_card">Pridať prvú kartu</button>
     </div>
 
-    <button id="fab-add" class="fab" aria-label="Pridat kartu">
+    <button id="fab-add" class="fab" aria-label="Pridať kartu">
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>
     </button>
   </section>
@@ -93,113 +93,113 @@
       </div>
 
       <div class="settings-group">
-        <h3 data-i18n="settings_theme">Vzhlad</h3>
+        <h3 data-i18n="settings_theme">Vzhľad</h3>
         <div class="segmented" id="theme-segmented">
-          <button data-value="light" data-i18n="theme_light">Svetly</button>
-          <button data-value="dark" data-i18n="theme_dark">Tmavy</button>
-          <button data-value="system" data-i18n="theme_system">Podla systemu</button>
+          <button data-value="light" data-i18n="theme_light">Svetlý</button>
+          <button data-value="dark" data-i18n="theme_dark">Tmavý</button>
+          <button data-value="system" data-i18n="theme_system">Podľa systému</button>
         </div>
       </div>
 
       <div class="settings-group" id="search-settings-group">
-        <h3 data-i18n="settings_search">Vyhladavanie</h3>
+        <h3 data-i18n="settings_search">Vyhľadávanie</h3>
         <div class="segmented" id="search-scope-segmented">
-          <button data-value="all" data-i18n="search_scope_all">Vo vsetkych kartach</button>
-          <button data-value="category" data-i18n="search_scope_category">Len vo zvolenej kategorii</button>
+          <button data-value="all" data-i18n="search_scope_all">Vo všetkých kartách</button>
+          <button data-value="category" data-i18n="search_scope_category">Len vo zvolenej kategórii</button>
         </div>
-        <p class="hint" data-i18n="search_scope_hint">Pri hladani vo vsetkych kartach sa zvoleny filter kategorie docasne ignoruje, aby sa karta nestratila.</p>
-        <label class="check-row"><input type="checkbox" id="search-scope-dismiss"><span data-i18n="search_scope_dismiss">Uz neupozornovat pod vyhladavacim polom</span></label>
+        <p class="hint" data-i18n="search_scope_hint">Pri hľadaní vo všetkých kartách sa zvolený filter kategórie dočasne ignoruje, aby sa karta nestratila.</p>
+        <label class="check-row"><input type="checkbox" id="search-scope-dismiss"><span data-i18n="search_scope_dismiss">Už neupozorňovať pod vyhľadávacím poľom</span></label>
       </div>
 
       <div class="settings-group">
-        <h3 data-i18n="settings_recent_first">Naposledy pouzite navrchu</h3>
+        <h3 data-i18n="settings_recent_first">Naposledy použité navrchu</h3>
         <div class="segmented" id="recent-first-segmented">
-          <button data-value="on" data-i18n="vibration_on">Zapnute</button>
-          <button data-value="off" data-i18n="vibration_off">Vypnute</button>
+          <button data-value="on" data-i18n="vibration_on">Zapnuté</button>
+          <button data-value="off" data-i18n="vibration_off">Vypnuté</button>
         </div>
-        <p class="hint" data-i18n="recent_first_hint">Pri radeni podla pouzitia sa karty otvorene dnes a vcera zobrazia na zaciatku zoznamu.</p>
+        <p class="hint" data-i18n="recent_first_hint">Pri radení podľa používania sa karty otvorené dnes a včera zobrazia na začiatku zoznamu.</p>
       </div>
 
       <div class="settings-group">
-        <h3 data-i18n="settings_install">Instalacia na plochu</h3>
+        <h3 data-i18n="settings_install">Inštalácia na plochu</h3>
         <p id="install-status" class="hint"></p>
-        <button id="settings-install-btn" class="btn btn-secondary" data-i18n="settings_install_button">Instalovat aplikaciu</button>
+        <button id="settings-install-btn" class="btn btn-secondary" data-i18n="settings_install_button">Inštalovať aplikáciu</button>
       </div>
 
       <div class="settings-group">
         <h3 data-i18n="settings_gps">Poloha (GPS)</h3>
         <div class="segmented" id="gps-segmented">
-          <button data-value="on" data-i18n="gps_on">Zapnuta</button>
-          <button data-value="off" data-i18n="gps_off">Vypnuta</button>
+          <button data-value="on" data-i18n="gps_on">Zapnutá</button>
+          <button data-value="off" data-i18n="gps_off">Vypnutá</button>
         </div>
-        <p class="hint" data-i18n="gps_hint">Ked je vypnuta, appka nezistuje polohu a nezerie baterku. Je potrebna len na radenie kariet podla vzdialenosti pobocky.</p>
+        <p class="hint" data-i18n="gps_hint">Keď je vypnutá, appka nezisťuje polohu a nežerie batériu. Je potrebná len na radenie kariet podľa vzdialenosti pobočky.</p>
       </div>
 
       <div class="settings-group">
-        <h3 data-i18n="settings_vibration">Vibracie</h3>
+        <h3 data-i18n="settings_vibration">Vibrácie</h3>
         <div class="segmented" id="vibration-segmented">
-          <button data-value="on" data-i18n="vibration_on">Zapnute</button>
-          <button data-value="off" data-i18n="vibration_off">Vypnute</button>
+          <button data-value="on" data-i18n="vibration_on">Zapnuté</button>
+          <button data-value="off" data-i18n="vibration_off">Vypnuté</button>
         </div>
-        <p class="hint" data-i18n="vibration_hint">Kratka vibracia pri dlhom stlaceni karty. Niektore zariadenia (iPhone) vibracie vo webovej aplikacii nepodporuju.</p>
+        <p class="hint" data-i18n="vibration_hint">Krátka vibrácia pri dlhom stlačení karty. Niektoré zariadenia (iPhone) vibrácie vo webovej aplikácii nepodporujú.</p>
       </div>
 
       <div class="settings-group">
-        <h3><span data-i18n="settings_categories">Kategorie</span> <span id="settings-cards-total" class="settings-total"></span></h3>
+        <h3><span data-i18n="settings_categories">Kategórie</span> <span id="settings-cards-total" class="settings-total"></span></h3>
         <div id="settings-category-list" class="settings-category-list"></div>
-        <button id="settings-add-category" class="btn btn-ghost" data-i18n="category_add_new">+ Pridat vlastnu kategoriu</button>
+        <button id="settings-add-category" class="btn btn-ghost" data-i18n="category_add_new">+ Pridať vlastnú kategóriu</button>
       </div>
 
       <div class="settings-group">
-        <h3 data-i18n="settings_backup">Zaloha a obnovenie</h3>
-        <p class="hint" data-i18n="backup_folder_desc">Automaticka zaloha do priecinka.</p>
-        <button id="choose-folder-btn" class="btn btn-secondary" data-i18n="backup_choose_folder">Vybrat priecinok pre zalohu</button>
+        <h3 data-i18n="settings_backup">Záloha a obnovenie</h3>
+        <p class="hint" data-i18n="backup_folder_desc">Automatická tichá záloha do priečinka v zariadení.</p>
+        <button id="choose-folder-btn" class="btn btn-secondary" data-i18n="backup_choose_folder">Vybrať priečinok pre zálohu</button>
         <p id="folder-status" class="hint hint-success" hidden></p>
         <p id="last-backup-status" class="hint"></p>
         <div class="btn-row">
-          <button id="backup-now-btn" class="btn btn-success" data-i18n="backup_now">Zalohovat teraz</button>
-          <button id="import-backup-btn" class="btn btn-blue" data-i18n="backup_import">Obnovit zo zalohy</button>
+          <button id="backup-now-btn" class="btn btn-success" data-i18n="backup_now">Zálohovať teraz</button>
+          <button id="import-backup-btn" class="btn btn-blue" data-i18n="backup_import">Obnoviť zo zálohy</button>
         </div>
         <button id="send-all-qr-btn" class="btn btn-qr btn-qr-green" data-i18n="send_all_qr">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><path d="M14 14h3v3h-3zM19 19h2v2h-2zM14 19h2v2h-2zM19 14h2v2h-2z" fill="currentColor"/></svg>
-          <span data-i18n="send_all_qr">Prenos vsetkych kariet cez QR</span>
+          <span data-i18n="send_all_qr">Prenos všetkých kariet cez QR</span>
         </button>
-        <button id="export-backup-btn" class="btn btn-accent" data-i18n="backup_export_manual">Exportovat zalohu (subor)</button>
+        <button id="export-backup-btn" class="btn btn-accent" data-i18n="backup_export_manual">Exportovať zálohu (súbor)</button>
         <input type="file" id="import-file-input" accept="application/json,.json,.txt,text/plain" hidden>
       </div>
 
       <div class="settings-group">
-        <h3 data-i18n="settings_trash">Kos</h3>
+        <h3 data-i18n="settings_trash">Kôš</h3>
         <p id="trash-count" class="hint"></p>
         <div id="trash-list" class="trash-list"></div>
         <div class="btn-row">
-          <button id="trash-restore-all-btn" class="btn btn-success" data-i18n="trash_restore_all" hidden>Vratit vsetko</button>
-          <button id="trash-empty-btn" class="btn btn-danger" data-i18n="trash_empty_button" hidden>Vysypat kos</button>
+          <button id="trash-restore-all-btn" class="btn btn-success" data-i18n="trash_restore_all" hidden>Vrátiť všetko</button>
+          <button id="trash-empty-btn" class="btn btn-danger" data-i18n="trash_empty_button" hidden>Vysypať kôš</button>
         </div>
       </div>
 
       <div class="settings-group">
-        <h3 data-i18n="settings_data">Data</h3>
-        <button id="reset-data-btn" class="btn btn-danger-ghost" data-i18n="settings_reset">Vymazat vsetky data appky</button>
+        <h3 data-i18n="settings_data">Dáta</h3>
+        <button id="reset-data-btn" class="btn btn-danger-ghost" data-i18n="settings_reset">Vymazať všetky dáta appky</button>
       </div>
 
       <div class="settings-group">
         <h3 data-i18n="settings_about">O appke</h3>
-        <label class="check-row"><input type="checkbox" id="app-title-show" checked><span data-i18n="app_title_show">Zobrazovat nazov v prvom riadku prehladu</span></label>
+        <label class="check-row"><input type="checkbox" id="app-title-show" checked><span data-i18n="app_title_show">Zobrazovať názov v prvom riadku prehľadu</span></label>
         <div id="app-title-edit">
-          <label class="field-label" data-i18n="app_title_label">Nazov aplikacie v zahlavi</label>
+          <label class="field-label" data-i18n="app_title_label">Názov aplikácie v záhlaví</label>
           <input type="text" id="app-title-input" name="vk-f3" readonly autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" maxlength="24">
-          <button id="app-title-save" class="btn btn-success app-title-save" data-i18n="save">Ulozit</button>
+          <button id="app-title-save" class="btn btn-success app-title-save" data-i18n="save">Uložiť</button>
         </div>
 
-        <button id="show-app-qr-btn" class="btn btn-blue full-width" data-i18n="app_qr_button">Zobrazit QR na stiahnutie appky</button>
+        <button id="show-app-qr-btn" class="btn btn-blue full-width" data-i18n="app_qr_button">Zobraziť QR na stiahnutie appky</button>
         <div id="app-qr-wrap" class="app-qr-wrap" hidden>
           <div id="app-qr" class="app-qr"></div>
           <a id="app-qr-link" class="app-qr-link" href="https://teleteser.github.io/vernostka" target="_blank" rel="noopener">https://teleteser.github.io/vernostka</a>
         </div>
 
-        <p class="app-version">Vernostka_v28 &copy; 06.09.2026 15:50 Vojta</p>
-        <p class="hint">Vernostka - offline sprava vernostnych kariet. Ziadny ucet, ziadny cloud, ziadne sledovanie.</p>
+        <p class="app-version">Vernostka_v30 &copy; 06.09.2026 17:30 Vojta</p>
+        <p class="hint">Vernostka – offline správa vernostných kariet. Žiadny účet, žiadny cloud, žiadne sledovanie.</p>
       </div>
     </div>
   </section>
@@ -222,14 +222,14 @@
       <button class="icon-btn" id="edit-close-btn">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
-      <h2 id="edit-title" data-i18n="add_card">Pridat kartu</h2>
-      <button class="text-btn save-btn-highlight" id="edit-save-btn" data-i18n="save">Ulozit</button>
+      <h2 id="edit-title" data-i18n="add_card">Pridať kartu</h2>
+      <button class="text-btn save-btn-highlight" id="edit-save-btn" data-i18n="save">Uložiť</button>
     </header>
 
     <div class="modal-body">
       <div id="capture-tabs" class="segmented segmented-wide">
-        <button data-value="scan" class="active" data-i18n="scan_tab">Skenovat</button>
-        <button data-value="manual" data-i18n="manual_tab">Zadat rucne</button>
+        <button data-value="scan" class="active" data-i18n="scan_tab">Skenovať</button>
+        <button data-value="manual" data-i18n="manual_tab">Zadať ručne</button>
       </div>
 
       <div id="scan-pane" class="capture-pane">
@@ -237,44 +237,44 @@
           <video id="scan-video" playsinline muted></video>
           <div class="scan-reticle"></div>
         </div>
-        <p class="hint center" data-i18n="scan_hint">Namier fotoaparat na kod.</p>
+        <p class="hint center" data-i18n="scan_hint">Namier fotoaparát na čiarový alebo QR kód na karte.</p>
         <div id="scan-progress" class="transfer-progress" hidden>
           <p id="scan-progress-hint" class="transfer-progress-text"></p>
           <div id="scan-progress-bar" class="progress-segments"></div>
           <p id="scan-progress-sub" class="hint center"></p>
         </div>
         <div class="btn-row center">
-          <button id="switch-camera-btn" class="btn btn-ghost small" data-i18n="scan_switch_camera">Prepnut kameru</button>
-          <button id="photo-scan-btn" class="btn btn-ghost small" data-i18n="photo_scan_button">Odfotit kod</button>
+          <button id="switch-camera-btn" class="btn btn-ghost small" data-i18n="scan_switch_camera">Prepnúť kameru</button>
+          <button id="photo-scan-btn" class="btn btn-ghost small" data-i18n="photo_scan_button">Odfotiť kód</button>
         </div>
         <input type="file" id="photo-scan-input" accept="image/*" capture="environment" hidden>
         <div id="camera-denied" class="camera-denied" hidden>
-          <p class="hint"><strong data-i18n="camera_denied_title">Pristup ku kamere nie je povoleny</strong></p>
-          <p class="hint" data-i18n="camera_denied_desc">Povol pristup ku kamere v nastaveniach.</p>
+          <p class="hint"><strong data-i18n="camera_denied_title">Prístup ku kamere nie je povolený</strong></p>
+          <p class="hint" data-i18n="camera_denied_desc">Aby appka mohla skenovať kódy, povoľ prístup ku kamere v nastaveniach prehliadača a načítaj stránku znova.</p>
           <div class="btn-row center">
-            <button id="camera-denied-photo-btn" class="btn btn-secondary small" data-i18n="photo_scan_button">Odfotit kod</button>
-            <button id="camera-denied-manual-btn" class="btn btn-secondary small" data-i18n="use_manual_instead">Zadat kod rucne</button>
+            <button id="camera-denied-photo-btn" class="btn btn-secondary small" data-i18n="photo_scan_button">Odfotiť kód</button>
+            <button id="camera-denied-manual-btn" class="btn btn-secondary small" data-i18n="use_manual_instead">Zadať kód ručne</button>
           </div>
         </div>
         <div id="scan-slow-hint" class="scan-slow-hint" hidden>
-          <p class="hint" data-i18n="scan_slow_hint">Nedari sa naskenovat?</p>
+          <p class="hint" data-i18n="scan_slow_hint">Nedarí sa naskenovať? Skús kód napísať ručne, appka ho vygeneruje.</p>
           <div class="btn-row center">
-            <button id="scan-slow-photo-btn" class="btn btn-ghost small" data-i18n="photo_scan_button">Odfotit kod</button>
-            <button id="scan-slow-manual-btn" class="btn btn-ghost small" data-i18n="use_manual_instead">Zadat kod rucne</button>
+            <button id="scan-slow-photo-btn" class="btn btn-ghost small" data-i18n="photo_scan_button">Odfotiť kód</button>
+            <button id="scan-slow-manual-btn" class="btn btn-ghost small" data-i18n="use_manual_instead">Zadať kód ručne</button>
           </div>
         </div>
       </div>
 
       <div id="manual-pane" class="capture-pane" hidden>
         <div class="code-preview" id="manual-code-preview"></div>
-        <label class="field-label" data-i18n="card_code_label">Cislo / kod karty</label>
-        <input type="text" id="field-code" name="vk-f2" readonly autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-form-type="other" data-i18n-placeholder="card_code_placeholder" placeholder="Naskenuj alebo zadaj cislo">
-        <label class="field-label" data-i18n="code_type_label">Typ kodu</label>
+        <label class="field-label" data-i18n="card_code_label">Číslo / kód karty</label>
+        <input type="text" id="field-code" name="vk-f2" readonly autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-form-type="other" data-i18n-placeholder="card_code_placeholder" placeholder="Naskenuj alebo zadaj číslo">
+        <label class="field-label" data-i18n="code_type_label">Typ kódu</label>
         <select id="field-code-type"></select>
       </div>
 
       <div class="form-section">
-        <label class="field-label" data-i18n="store_name_label">Nazov obchodu</label>
+        <label class="field-label" data-i18n="store_name_label">Názov obchodu</label>
         <div class="store-name-row">
           <div id="store-logo-preview" class="store-logo-preview"></div>
           <input type="text" id="field-store-name" name="vk-f1" readonly autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-form-type="other" data-i18n-placeholder="store_name_placeholder" placeholder="napr. Lidl">
@@ -284,10 +284,10 @@
         <div class="appearance-row">
           <div class="appearance-field">
             <label data-i18n="abbreviation_label">Skratka karty</label>
-            <textarea id="field-abbreviation" rows="2" autocomplete="off" maxlength="20" class="abbreviation-textarea" data-i18n-placeholder="abbreviation_placeholder" placeholder="napr. LIDL"></textarea>
+            <textarea id="field-abbreviation" rows="2" autocomplete="off" maxlength="20" class="abbreviation-textarea" data-i18n-placeholder="abbreviation_placeholder" placeholder="napr. LI"></textarea>
           </div>
           <div class="appearance-field">
-            <label data-i18n="logo_color_label">Farba policka</label>
+            <label data-i18n="logo_color_label">Farba políčka</label>
             <div class="color-input-wrap"><input type="color" id="field-logo-color"></div>
           </div>
           <div class="appearance-field">
@@ -296,22 +296,22 @@
           </div>
         </div>
 
-        <label class="field-label" data-i18n="category_label">Kategorie</label>
-        <p class="hint" data-i18n="category_multi_hint">Karta moze patrit do viacerych kategorii.</p>
+        <label class="field-label" data-i18n="category_label">Kategórie</label>
+        <p class="hint" data-i18n="category_multi_hint">Karta môže patriť do viacerých kategórií.</p>
         <div id="field-category-chips" class="chip-row wrap"></div>
-        <button type="button" id="field-category-new-btn" class="btn btn-ghost" data-i18n="category_add_new">+ Pridat vlastnu kategoriu</button>
+        <button type="button" id="field-category-new-btn" class="btn btn-ghost" data-i18n="category_add_new">+ Pridať vlastnú kategóriu</button>
 
-        <label class="field-label" data-i18n="note_label">Poznamka (nepovinne)</label>
-        <textarea id="field-note" rows="2" autocomplete="off" data-i18n-placeholder="note_placeholder" placeholder="napr. PIN..."></textarea>
+        <label class="field-label" data-i18n="note_label">Poznámka (nepovinné)</label>
+        <textarea id="field-note" rows="2" autocomplete="off" data-i18n-placeholder="note_placeholder" placeholder="napr. PIN, platnosť karty…"></textarea>
 
-        <label class="field-label" data-i18n="location_label">Poloha obchodu (nepovinne)</label>
-        <p class="hint" data-i18n="location_permission_note">GPS poloha je nepovinna.</p>
+        <label class="field-label" data-i18n="location_label">Poloha obchodu (nepovinné)</label>
+        <p class="hint" data-i18n="location_permission_note">GPS poloha je nepovinná – appka funguje aj bez nej, len bez radenia podľa vzdialenosti.</p>
         <div id="location-list" class="location-list"></div>
-        <button id="add-location-btn" class="btn btn-ghost" data-i18n="add_location">+ Pridat pobocku</button>
+        <button id="add-location-btn" class="btn btn-ghost" data-i18n="add_location">+ Pridať pobočku</button>
 
         <div id="edit-danger-actions" class="btn-row" hidden>
-          <button id="edit-delete-card-btn" class="btn btn-danger-ghost small" data-i18n="delete_card_title">Zmazat kartu</button>
-          <button id="edit-clear-history-btn" class="btn btn-danger-ghost small" data-i18n="delete_history_title">Vymazat historiu</button>
+          <button id="edit-delete-card-btn" class="btn btn-danger-ghost small" data-i18n="delete_card_title">Zmazať kartu?</button>
+          <button id="edit-clear-history-btn" class="btn btn-danger-ghost small" data-i18n="delete_history_title">Vymazať históriu?</button>
         </div>
       </div>
     </div>
@@ -323,14 +323,14 @@
       <button class="icon-btn" id="map-close-btn">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
-      <h2 data-i18n="location_label">Poloha obchodu</h2>
-      <button class="text-btn" id="map-save-btn" data-i18n="save">Ulozit</button>
+      <h2 data-i18n="location_label">Poloha obchodu (nepovinné)</h2>
+      <button class="text-btn" id="map-save-btn" data-i18n="save">Uložiť</button>
     </header>
     <div class="modal-body no-pad">
-      <input type="text" id="location-name-input" class="location-name-input" autocomplete="off" data-i18n-placeholder="location_name_placeholder" placeholder="napr. Lidl Dunajska Streda">
-      <p class="hint center" data-i18n="map_pick_hint">Klikni na mapu.</p>
+      <input type="text" id="location-name-input" class="location-name-input" autocomplete="off" data-i18n-placeholder="location_name_placeholder" placeholder="napr. Lidl Dunajská Streda">
+      <p class="hint center" data-i18n="map_pick_hint">Klepni na mapu a označ polohu obchodu.</p>
       <div id="map-container"></div>
-      <button id="map-use-current-btn" class="btn btn-ghost" data-i18n="map_use_current">Pouzit moju polohu</button>
+      <button id="map-use-current-btn" class="btn btn-ghost" data-i18n="map_use_current">Použiť moju polohu</button>
     </div>
   </div>
 
@@ -351,9 +351,9 @@
       </button>
 
       <div class="detail-actions-row">
-        <div class="stat-pill stat-pill-narrow"><span data-i18n="combined_uses_label">Zobrazene</span><strong id="detail-uses">0 x</strong></div>
+        <div class="stat-pill stat-pill-narrow"><span data-i18n="combined_uses_label">Zobrazené</span><strong id="detail-uses">0 x</strong></div>
         <div class="stat-pill stat-pill-wide"><span data-i18n="last_used">Naposledy</span><strong id="detail-last-used">-</strong></div>
-        <button id="toggle-history-btn" class="stat-pill pill-button stat-pill-narrow" data-i18n="history_title">Historia</button>
+        <button id="toggle-history-btn" class="stat-pill pill-button stat-pill-narrow" data-i18n="history_title">História používania</button>
       </div>
 
       <div id="detail-history-section" hidden>
@@ -361,7 +361,7 @@
       </div>
 
       <div class="detail-section">
-        <h3 id="detail-note-title" data-i18n="note_label" hidden>Poznamka</h3>
+        <h3 id="detail-note-title" data-i18n="note_label" hidden>Poznámka (nepovinné)</h3>
         <p id="detail-note"></p>
       </div>
     </div>
@@ -380,9 +380,9 @@
       <div id="fs-code-container" class="fs-code-container"></div>
     </div>
     <div class="fs-controls">
-      <button id="fs-rotate-btn" class="btn btn-ghost small" data-i18n="fullscreen_rotate">Otocit</button>
+      <button id="fs-rotate-btn" class="btn btn-ghost small" data-i18n="fullscreen_rotate">Otočiť</button>
       <input type="range" id="fs-zoom" min="60" max="150" value="100">
-      <button id="fs-reset-position-btn" class="btn btn-ghost small" data-i18n="position_reset">Predvolena poloha</button>
+      <button id="fs-reset-position-btn" class="btn btn-ghost small" data-i18n="position_reset">Predvolená poloha</button>
     </div>
   </div>
 
@@ -394,10 +394,10 @@
       </div>
       <h3 id="confirm-title">-</h3>
       <p id="confirm-desc">-</p>
-      <p id="confirm-warning" class="confirm-warning" hidden data-i18n="irreversible_warning">Tuto akciu nemozno vratit spat.</p>
+      <p id="confirm-warning" class="confirm-warning" hidden data-i18n="irreversible_warning">Túto akciu nemožno vrátiť späť.</p>
       <div class="btn-row">
-        <button id="confirm-cancel-btn" class="btn btn-ghost" data-i18n="cancel">Zrusit</button>
-        <button id="confirm-ok-btn" class="btn btn-danger" data-i18n="confirm">Potvrdit</button>
+        <button id="confirm-cancel-btn" class="btn btn-ghost" data-i18n="cancel">Zrušiť</button>
+        <button id="confirm-ok-btn" class="btn btn-danger" data-i18n="confirm">Potvrdiť</button>
       </div>
     </div>
   </div>
@@ -405,16 +405,16 @@
   <!-- ===================== SEND CARDS METHOD DIALOG ===================== -->
   <div id="modal-send-method" class="modal-overlay" hidden>
     <div class="modal-sheet">
-      <h3 data-i18n="send_title">Zdielat karty</h3>
+      <h3 data-i18n="send_title">Zdieľať karty</h3>
       <p id="send-method-desc"></p>
       <div class="btn-row">
-        <button id="send-via-qr-btn" class="btn btn-success" data-i18n="send_via_qr" hidden>Zobrazit ako QR kod</button>
+        <button id="send-via-qr-btn" class="btn btn-success" data-i18n="send_via_qr" hidden>Zobraziť ako QR kód</button>
       </div>
       <div class="btn-row">
-        <button id="send-via-file-btn" class="btn btn-success-soft" data-i18n="send_via_file">Zdielat subor</button>
+        <button id="send-via-file-btn" class="btn btn-success-soft" data-i18n="send_via_file">Zdieľať súbor</button>
       </div>
       <div class="btn-row">
-        <button id="send-method-cancel-btn" class="btn btn-danger" data-i18n="cancel">Zrusit</button>
+        <button id="send-method-cancel-btn" class="btn btn-danger" data-i18n="cancel">Zrušiť</button>
       </div>
     </div>
   </div>
@@ -425,7 +425,7 @@
       <button id="send-qr-close-btn" class="fs-close-btn" aria-label="Close">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#111" stroke-width="2.4" stroke-linecap="round"/></svg>
       </button>
-      <div class="fs-store-name" data-i18n="send_title">Odoslat karty</div>
+      <div class="fs-store-name" data-i18n="send_title">Zdieľať karty</div>
       <div class="fs-header-spacer"></div>
     </div>
     <div class="fs-code-stage">
@@ -436,34 +436,34 @@
         <p id="send-qr-progress" class="transfer-progress-text"></p>
         <div id="send-qr-bar" class="progress-segments"></div>
       </div>
-      <p class="hint center" data-i18n="send_qr_hint">Druhy telefon nech otvori Skenovat.</p>
+      <p class="hint center" data-i18n="send_qr_hint">Druhý telefón nech v appke Vernostka otvorí „Skenovať“ a namieri na tento kód.</p>
       <div id="send-qr-nav" class="send-qr-nav" hidden>
-        <button id="send-qr-prev-btn" class="btn btn-secondary small" aria-label="Predchadzajuci">&#9664;</button>
-        <button id="send-qr-play-btn" class="btn btn-secondary small" data-i18n="send_qr_pause">Pozastavit</button>
-        <button id="send-qr-next-btn" class="btn btn-secondary small" aria-label="Dalsi">&#9654;</button>
+        <button id="send-qr-prev-btn" class="btn btn-secondary small" aria-label="Predchádzajúci">&#9664;</button>
+        <button id="send-qr-play-btn" class="btn btn-secondary small" data-i18n="send_qr_pause">Pozastaviť</button>
+        <button id="send-qr-next-btn" class="btn btn-secondary small" aria-label="Ďalší">&#9654;</button>
       </div>
-      <button id="send-qr-end-btn" class="btn btn-primary" data-i18n="send_end_transfer">Ukoncit prenos</button>
-      <button id="send-qr-history-btn" class="btn btn-ghost small" data-i18n="send_history_button">Historia prenosov</button>
+      <button id="send-qr-end-btn" class="btn btn-primary" data-i18n="send_end_transfer">Ukončiť prenos</button>
+      <button id="send-qr-history-btn" class="btn btn-ghost small" data-i18n="send_history_button">História prenosov</button>
     </div>
   </div>
 
   <!-- ===================== TRANSFER HISTORY ===================== -->
   <div id="modal-transfer-history" class="modal-overlay" hidden>
     <div class="modal-sheet">
-      <h3 data-i18n="send_history_title">Historia prenosov</h3>
+      <h3 data-i18n="send_history_title">História prenosov</h3>
       <div id="transfer-history-list" class="history-list"></div>
-      <button id="transfer-history-close-btn" class="btn btn-ghost" data-i18n="close">Zavriet</button>
+      <button id="transfer-history-close-btn" class="btn btn-ghost" data-i18n="close">Zavrieť</button>
     </div>
   </div>
 
   <!-- ===================== BULK CATEGORY ASSIGN DIALOG ===================== -->
   <div id="modal-bulk-category" class="modal-overlay" hidden>
     <div class="modal-sheet">
-      <h3 data-i18n="bulk_assign_title">Priradit kategoriu</h3>
+      <h3 data-i18n="bulk_assign_title">Priradiť kategóriu</h3>
       <p id="bulk-assign-desc"></p>
       <div id="bulk-category-list" class="chip-row wrap"></div>
-      <button id="bulk-category-new-btn" class="btn btn-secondary" data-i18n="bulk_assign_new_category">VYTVORIT NOVU KATEGORIU</button>
-      <button id="bulk-category-cancel-btn" class="btn btn-ghost" data-i18n="cancel">Zrusit</button>
+      <button id="bulk-category-new-btn" class="btn btn-secondary" data-i18n="bulk_assign_new_category">VYTVORIŤ NOVÚ KATEGÓRIU</button>
+      <button id="bulk-category-cancel-btn" class="btn btn-ghost" data-i18n="cancel">Zrušiť</button>
     </div>
   </div>
 
@@ -471,17 +471,28 @@
   <div id="modal-install" class="modal-overlay" hidden>
     <div class="modal-sheet big install-sheet">
       <h3 id="install-title" data-i18n="install_prompt_title">Pridaj Vernostku na plochu</h3>
-      <p id="install-desc" data-i18n="install_prompt_desc">Ak appku nepridas na plochu, prehliadac moze po case vymazat lokalne ulozene data.</p>
-      <button id="install-now-btn" class="btn btn-primary install-main-btn" data-i18n="install_now" hidden>Instalovat teraz</button>
+      <p id="install-desc" data-i18n="install_prompt_desc">Vernostka funguje aj bez internetu, no ak ju nepridáš na plochu, prehliadač môže po čase vymazať lokálne uložené dáta (na iPhone už po ~7 dňoch nepoužívania). Pridaním na plochu tomu predídeš a appka sa spúšťa rýchlejšie.</p>
+      <button id="install-now-btn" class="btn btn-primary install-main-btn" data-i18n="install_now" hidden>Inštalovať teraz</button>
       <div class="install-steps">
-        <h4 data-i18n="install_android_title">Android (Chrome)</h4>
-        <p data-i18n="install_android_steps">Menu s tromi bodkami vpravo hore, potom "Pridat na plochu" alebo "Instalovat aplikaciu".</p>
+        <div id="install-ios-warning" class="install-warning" hidden>
+          <strong data-i18n="install_ios_wrong_browser_title">Tento prehliadač inštaláciu neponúka</strong>
+          <p data-i18n="install_ios_wrong_browser">Na iPhone sa dá appka pridať na plochu iba v Safari – nie v Chrome ani v prehliadači vo vnútri inej aplikácie (Facebook, Messenger, Gmail…). Skopíruj si adresu, otvor Safari a vlož ju tam.</p>
+          <button id="install-copy-url" class="btn btn-blue full-width" data-i18n="install_copy_url">Skopírovať adresu appky</button>
+        </div>
         <h4 data-i18n="install_ios_title">iPhone (Safari)</h4>
-        <p data-i18n="ios_install_steps">V Safari klikni na tlacidlo Zdielat, potom "Pridat na plochu".</p>
+        <ol class="install-list">
+          <li data-i18n="install_ios_step1">Otvor stránku v Safari (nie v anonymnom okne).</li>
+          <li data-i18n="install_ios_step2">Vpravo dole klepni na tri bodky – otvorí sa menu Safari.</li>
+          <li data-i18n="install_ios_step3">V menu vyber „Zdieľať“ a potom „Zobraziť viac“.</li>
+          <li data-i18n="install_ios_step4">V zozname klepni na položku s ikonou + „Pridať na plochu“ a vpravo hore potvrď Pridať.</li>
+        </ol>
+        <p class="hint" data-i18n="install_ios_note">Ak položku „Pridať na plochu“ nevidíš, posuň zoznam nižšie – býva až za zdieľacími aplikáciami.</p>
+        <h4 data-i18n="install_android_title">Android (Chrome)</h4>
+        <p data-i18n="install_android_steps">Menu s tromi bodkami vpravo hore, potom „Pridať na plochu“ alebo „Inštalovať aplikáciu“.</p>
       </div>
       <div class="btn-row">
-        <button id="install-later-btn" class="btn btn-ghost" data-i18n="install_later">Neskor</button>
-        <button id="install-dismiss-btn" class="btn btn-ghost" data-i18n="install_dismiss">Uz nezobrazovat</button>
+        <button id="install-later-btn" class="btn btn-ghost" data-i18n="install_later">Neskôr</button>
+        <button id="install-dismiss-btn" class="btn btn-ghost" data-i18n="install_dismiss">Už nezobrazovať</button>
       </div>
     </div>
   </div>
@@ -502,7 +513,7 @@
           <path class="trash-item" d="M10 10v7M14 10v7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </svg>
       </div>
-      <p id="restore-overlay-text" data-i18n="restore_progress">Obnovujem data zo zalohy...</p>
+      <p id="restore-overlay-text" data-i18n="restore_progress">Obnovujem dáta zo zálohy…</p>
       <div class="restore-bar"><div id="restore-overlay-bar" class="restore-bar-fill"></div></div>
     </div>
   </div>
