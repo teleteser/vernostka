@@ -98,9 +98,10 @@ p { margin: 0.35em 0; }
   align-items: center;
   gap: 8px;
   background: var(--surface);
-  border: 1px solid transparent;
+  border: none;
   border-radius: 12px;
-  padding: 10px 14px;
+  /* +1px to keep exactly the height the 1px border used to add */
+  padding: 11px 15px;
   color: var(--text-muted);
 }
 .search-box input {
@@ -836,22 +837,22 @@ body.modal-open #app { overflow: hidden; }
 
 /* Highlight a settings group jumped to from elsewhere */
 /* Steady red frame for 2 s, then three slower blinks, then a slow fade out. */
+/* Drawn as an outline with an offset: unlike padding/margin it takes no space at all, so
+   nothing on the settings screen moves while (or after) the highlight runs. */
 .settings-flash {
   animation: settings-flash 5s ease-out;
   border-radius: 14px;
-  /* Breathing room so the red frame never sits on top of the text */
-  padding: 10px 12px;
-  margin: -10px -12px;
+  outline-offset: 10px;
 }
 @keyframes settings-flash {
-  0%, 40% { box-shadow: 0 0 0 4px rgba(211,66,62,0.95); }
-  48% { box-shadow: 0 0 0 0 rgba(211,66,62,0); }
-  56% { box-shadow: 0 0 0 4px rgba(211,66,62,0.95); }
-  64% { box-shadow: 0 0 0 0 rgba(211,66,62,0); }
-  72% { box-shadow: 0 0 0 4px rgba(211,66,62,0.95); }
-  80% { box-shadow: 0 0 0 0 rgba(211,66,62,0); }
-  88% { box-shadow: 0 0 0 4px rgba(211,66,62,0.55); }
-  100% { box-shadow: 0 0 0 6px rgba(211,66,62,0); }
+  0%, 40% { outline: 4px solid rgba(211,66,62,0.95); }
+  48% { outline: 4px solid rgba(211,66,62,0); }
+  56% { outline: 4px solid rgba(211,66,62,0.95); }
+  64% { outline: 4px solid rgba(211,66,62,0); }
+  72% { outline: 4px solid rgba(211,66,62,0.95); }
+  80% { outline: 4px solid rgba(211,66,62,0); }
+  88% { outline: 4px solid rgba(211,66,62,0.5); }
+  100% { outline: 4px solid rgba(211,66,62,0); }
 }
 
 /* Checkbox row in settings */
@@ -955,9 +956,10 @@ body.modal-open #app { overflow: hidden; }
 }
 
 /* App name setting + install QR in About */
-.title-row { display: flex; gap: 10px; align-items: center; }
-.title-row input { flex: 1; }
-.title-row .btn { flex: 0 0 auto; padding: 12px 18px; }
+#app-title-edit { margin-top: 12px; }
+#app-title-input { width: 100%; min-width: 0; }
+.app-title-save { width: 100%; margin-top: 10px; padding: 12px; font-size: 15px; }
+.settings-content { overflow-x: hidden; }
 .full-width { width: 100%; margin-top: 12px; }
 .app-qr-wrap { margin: 14px 0 6px; text-align: center; }
 .app-qr { background: #fff; border-radius: 14px; padding: 12px; display: flex; justify-content: center; }

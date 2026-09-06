@@ -1,4 +1,4 @@
-// Vernostka main app controller - verzia v27
+// Vernostka main app controller - verzia v28
 
 // Chrome fires beforeinstallprompt very early - often before the app has finished starting
 // up - and only once. Catch it here, at script level, so the "Install now" button in the
@@ -146,6 +146,9 @@ const App = {
     if (input && document.activeElement !== input) input.value = this.appTitle || '';
     const check = document.getElementById('app-title-show');
     if (check) check.checked = !!this.showAppTitle;
+    // With the heading switched off there is nothing to name, so the name field is hidden.
+    const edit = document.getElementById('app-title-edit');
+    if (edit) edit.hidden = !this.showAppTitle;
   },
 
   applyRecentFirstToDom() {
