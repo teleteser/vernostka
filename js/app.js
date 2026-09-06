@@ -1,4 +1,4 @@
-// Vernostka main app controller - verzia v30
+// Vernostka main app controller - verzia v31
 
 // Chrome fires beforeinstallprompt very early - often before the app has finished starting
 // up - and only once. Catch it here, at script level, so the "Install now" button in the
@@ -1179,6 +1179,7 @@ const App = {
       if (!ok) return;
       // Into the trash rather than gone: it can be restored from Settings.
       await this.trashCard(await DB.getCard(this.editingCard.id) || this.editingCard);
+      await this.renderTrash();
       this.stopScanning();
       this.hideModal('modal-edit');
       this.hideModal('modal-detail');
@@ -2172,6 +2173,17 @@ const App = {
 
     // QR code with the app's web address, so it can be installed on another phone by
     // pointing its camera at this screen.
+    document.getElementById('app-qr-link').addEventListener('click', async () => {
+      // Inside an installed app this link points at the app itself, so opening it only made
+      // the screen flash. Copying the address is what people actually need here.
+      try {
+        await navigator.clipboard.writeText(this.APP_URL);
+        this.toast(i18n.t('install_url_copied'));
+      } catch (e) {
+        this.infoDialog(i18n.t('install_copy_url'), this.APP_URL, 20000);
+      }
+    });
+
     document.getElementById('show-app-qr-btn').addEventListener('click', () => {
       const wrap = document.getElementById('app-qr-wrap');
       const showing = wrap.hidden;
@@ -2483,6 +2495,7 @@ const App = {
         this.renderCategoryChips();
         this.renderCategorySelect();
         await this.renderCardsList();
+        await this.renderTrash();
         this.onDataChanged();
       });
       el.appendChild(row);
@@ -2507,6 +2520,7 @@ const App = {
     );
     if (!ok) return;
     for (const cat of empty) await this.trashCategory(cat);
+    await this.renderTrash();
     await this.loadCategories();
     this.renderCategoryChips();
     this.renderCategorySelect();

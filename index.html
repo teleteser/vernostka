@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Vernostka - verzia v30 -->
+<!-- Vernostka - verzia v31 -->
 <html lang="sk">
 <head>
 <meta charset="UTF-8">
@@ -188,17 +188,21 @@
         <label class="check-row"><input type="checkbox" id="app-title-show" checked><span data-i18n="app_title_show">Zobrazovať názov v prvom riadku prehľadu</span></label>
         <div id="app-title-edit">
           <label class="field-label" data-i18n="app_title_label">Názov aplikácie v záhlaví</label>
-          <input type="text" id="app-title-input" name="vk-f3" readonly autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" maxlength="24">
-          <button id="app-title-save" class="btn btn-success app-title-save" data-i18n="save">Uložiť</button>
+          <div class="title-row">
+            <input type="text" id="app-title-input" name="vk-f3" readonly autocomplete="off" autocorrect="off" spellcheck="false" data-form-type="other" maxlength="24">
+            <button id="app-title-save" class="btn btn-success app-title-save" data-i18n="app_title_change">Zmeniť</button>
+          </div>
         </div>
+        <hr class="settings-divider">
 
         <button id="show-app-qr-btn" class="btn btn-blue full-width" data-i18n="app_qr_button">Zobraziť QR na stiahnutie appky</button>
         <div id="app-qr-wrap" class="app-qr-wrap" hidden>
           <div id="app-qr" class="app-qr"></div>
-          <a id="app-qr-link" class="app-qr-link" href="https://teleteser.github.io/vernostka" target="_blank" rel="noopener">https://teleteser.github.io/vernostka</a>
+          <button id="app-qr-link" class="app-qr-link" type="button">https://teleteser.github.io/vernostka</button>
+          <p class="hint center" data-i18n="app_qr_link_hint">Klepnutím na adresu ju skopíruješ do schránky.</p>
         </div>
 
-        <p class="app-version">Vernostka_v30 &copy; 06.09.2026 17:30 Vojta</p>
+        <p class="app-version">Vernostka_v31 &copy; 06.09.2026 18:01 Vojta</p>
         <p class="hint">Vernostka – offline správa vernostných kariet. Žiadny účet, žiadny cloud, žiadne sledovanie.</p>
       </div>
     </div>

@@ -957,14 +957,29 @@ body.modal-open #app { overflow: hidden; }
 
 /* App name setting + install QR in About */
 #app-title-edit { margin-top: 12px; }
-#app-title-input { width: 100%; min-width: 0; }
-.app-title-save { width: 100%; margin-top: 10px; padding: 12px; font-size: 15px; }
+.title-row { display: flex; gap: 8px; align-items: stretch; }
+#app-title-input { flex: 3 1 0; min-width: 0; }
+.app-title-save { flex: 1 1 0; min-width: 0; padding: 12px 6px; font-size: 15px; white-space: nowrap; }
+/* Keeps the "change name" row well away from the QR button below it */
+.settings-divider { border: none; border-top: 1px solid var(--border); margin: 22px 0 18px; }
 .settings-content { overflow-x: hidden; }
 .full-width { width: 100%; margin-top: 12px; }
 .app-qr-wrap { margin: 14px 0 6px; text-align: center; }
 .app-qr { background: #fff; border-radius: 14px; padding: 12px; display: flex; justify-content: center; }
 .app-qr canvas, .app-qr img { width: 100%; height: auto; max-width: 420px; }
-.app-qr-link { display: inline-block; margin-top: 10px; font-size: 14px; font-weight: 700; color: var(--primary-light); word-break: break-all; }
+.app-qr-link {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: 1px dashed var(--primary-light);
+  border-radius: 10px;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary-light);
+  word-break: break-all;
+}
+.app-qr-link:active { opacity: 0.7; }
 
 /* iPhone install help */
 .install-list { margin: 6px 0 8px 20px; padding: 0; }
