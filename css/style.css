@@ -835,10 +835,10 @@ body.modal-open #app { overflow: hidden; }
 }
 
 /* Highlight a settings group jumped to from elsewhere */
-.settings-flash { animation: settings-flash 1.8s ease; border-radius: 12px; }
+.settings-flash { animation: settings-flash 2.4s ease; border-radius: 12px; }
 @keyframes settings-flash {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255,122,69,0); }
-  15%, 60% { box-shadow: 0 0 0 3px rgba(255,122,69,0.85); }
+  0%, 22%, 44%, 66%, 100% { box-shadow: 0 0 0 0 rgba(211,66,62,0); }
+  11%, 33%, 55% { box-shadow: 0 0 0 4px rgba(211,66,62,0.95); }
 }
 
 /* Checkbox row in settings */
@@ -867,3 +867,55 @@ body.modal-open #app { overflow: hidden; }
 /* Centre the QR on the sending screen */
 .send-qr-container { margin: 0 auto; }
 .fs-code-stage { display: flex; align-items: center; justify-content: center; }
+
+/* 3) fast red blink of the search box when the category changes mid-search */
+.search-box.search-flash { animation: search-flash 1.05s ease; }
+@keyframes search-flash {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(211,66,62,0); border-color: var(--border); }
+  16%, 50%, 83% { box-shadow: 0 0 0 3px rgba(211,66,62,0.9); border-color: var(--danger); }
+  33%, 66% { box-shadow: 0 0 0 0 rgba(211,66,62,0); border-color: var(--border); }
+}
+
+/* 1) current sort order shown next to the sort button */
+.sort-btn { width: auto; padding: 0 12px; gap: 6px; }
+.sort-label { font-size: 12px; font-weight: 700; color: var(--text-muted); white-space: nowrap; }
+
+/* 4) softer green for the secondary share option */
+.btn-success-soft { background: #8CCFA6; color: #10331f; border: 1px solid #8CCFA6; font-weight: 700; }
+[data-theme="dark"] .btn-success-soft { background: #2f6f4c; color: #eaf7ef; border-color: #2f6f4c; }
+
+/* 8) restore animation */
+.restore-overlay {
+  position: fixed; inset: 0; z-index: 220;
+  background: rgba(10,15,20,0.62);
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(2px);
+}
+.restore-card {
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 28px 26px;
+  width: min(86%, 340px);
+  text-align: center;
+  box-shadow: 0 18px 50px rgba(0,0,0,0.35);
+}
+.restore-icon { color: var(--primary-light); display: flex; justify-content: center; margin-bottom: 14px; }
+.restore-icon svg { animation: restore-spin 1.1s linear infinite; }
+@keyframes restore-spin { to { transform: rotate(360deg); } }
+.restore-card p { font-size: 16px; font-weight: 700; margin-bottom: 14px; }
+.restore-bar { height: 8px; border-radius: 999px; background: rgba(120,130,140,0.25); overflow: hidden; }
+.restore-bar-fill {
+  height: 100%; width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--primary-light), var(--success));
+  animation: restore-fill 1.4s ease-in-out forwards;
+}
+@keyframes restore-fill { from { width: 0; } to { width: 100%; } }
+
+/* 9) version line in About */
+.app-version { font-size: 13.5px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
+
+/* Backup section: each action its own colour */
+.btn-blue { background: var(--primary); color: #fff; border: 1px solid var(--primary); }
+[data-theme="dark"] .btn-blue { background: var(--primary-light); border-color: var(--primary-light); }
+.btn-qr-green { background: linear-gradient(135deg, #2E9E5B, #1f7a45); box-shadow: 0 4px 14px rgba(46,158,91,0.32); }

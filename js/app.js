@@ -1,4 +1,4 @@
-// Vernostka main app controller - verzia v24
+// Vernostka main app controller - verzia v25
 
 // Chrome fires beforeinstallprompt very early - often before the app has finished starting
 // up - and only once. Catch it here, at script level, so the "Install now" button in the
@@ -51,6 +51,7 @@ const App = {
     this.applyGpsToDom();
     this.applySearchScopeToDom();
     this.applyRecentFirstToDom();
+    this.updateSortLabel();
     this.updateInstallStatusUI();
     this.purgeOldTrash().then(() => this.renderTrash());
     this.renderCategoryChips();
@@ -115,6 +116,10 @@ const App = {
     // In "most used" order, cards opened today/yesterday are lifted to the top.
     this.recentFirst = await DB.getSetting('recentFirst', true);
     this.searchNoteDismissed = await DB.getSetting('searchNoteDismissed', false);
+    // Each category remembers how it was sorted the last time it was open.
+    this.sortByCategory = await DB.getSetting('sortByCategory', {}) || {};
+    this.defaultSort = this.currentSort;
+    if (this.sortByCategory[this.currentCategoryFilter]) this.currentSort = this.sortByCategory[this.currentCategoryFilter];
   },
 
   applyTheme() {
@@ -708,13 +713,53 @@ const App = {
     }
   },
 
+  sortLabel(mode) {
+    return i18n.t('sort_' + (mode === 'alpha' ? 'alpha' : mode === 'distance' ? 'distance' : 'frequency'));
+  },
+
   cycleSort() {
     const order = this.gpsEnabled ? ['frequency', 'alpha', 'distance'] : ['frequency', 'alpha'];
     const idx = order.indexOf(this.currentSort);
     this.currentSort = order[(idx + 1) % order.length];
-    DB.setSetting('sortMode', this.currentSort);
-    this.toast(i18n.t('sort_' + (this.currentSort === 'alpha' ? 'alpha' : this.currentSort === 'distance' ? 'distance' : 'frequency')));
+    // Remember the order per category, so every category keeps the view it was left in
+    // (the global sortMode stays the fallback for categories never sorted by hand).
+    this.sortByCategory[this.currentCategoryFilter] = this.currentSort;
+    DB.setSetting('sortByCategory', this.sortByCategory);
+    this.updateSortLabel();
+    this.toast(this.sortLabel(this.currentSort));
     this.renderCardsList();
+  },
+
+  updateSortLabel() {
+    const el = document.getElementById('sort-label');
+    if (el) el.textContent = this.sortLabel(this.currentSort);
+  },
+
+  // Switching category restores that category's own sort order and says which one it is.
+  async switchCategoryFilter(id) {
+    const searching = !!document.getElementById('search-input').value.trim();
+    this.currentCategoryFilter = id;
+    // A category that was never sorted by hand falls back to the global default rather
+    // than inheriting whatever the previous category happened to use.
+    let next = this.sortByCategory[id] || this.defaultSort || 'frequency';
+    if (next === 'distance' && !this.gpsEnabled) next = 'frequency';
+    const changedSort = next !== this.currentSort;
+    this.currentSort = next;
+    this.updateSortLabel();
+    this.renderCategoryChips();
+    await this.renderCardsList();
+    if (changedSort) this.toast(this.sortLabel(this.currentSort));
+    // A search term is still active - make it obvious that the list is filtered by it.
+    if (searching) this.flashSearchBox();
+  },
+
+  flashSearchBox() {
+    const box = document.querySelector('.search-box');
+    if (!box) return;
+    box.classList.remove('search-flash');
+    void box.offsetWidth;
+    box.classList.add('search-flash');
+    setTimeout(() => box.classList.remove('search-flash'), 1200);
   },
 
   renderCategoryChips() {
@@ -723,13 +768,13 @@ const App = {
     const allChip = document.createElement('button');
     allChip.className = 'chip' + (this.currentCategoryFilter === 'all' ? ' active' : '');
     allChip.textContent = i18n.t('filter_all');
-    allChip.addEventListener('click', () => { this.currentCategoryFilter = 'all'; this.renderCategoryChips(); this.renderCardsList(); });
+    allChip.addEventListener('click', () => this.switchCategoryFilter('all'));
     el.appendChild(allChip);
     this.categories.forEach((cat) => {
       const chip = document.createElement('button');
       chip.className = 'chip' + (this.currentCategoryFilter === cat.id ? ' active' : '');
       chip.textContent = this.categoryLabel(cat);
-      chip.addEventListener('click', () => { this.currentCategoryFilter = cat.id; this.renderCategoryChips(); this.renderCardsList(); });
+      chip.addEventListener('click', () => this.switchCategoryFilter(cat.id));
       el.appendChild(chip);
     });
   },
@@ -2012,8 +2057,16 @@ const App = {
     });
 
     document.getElementById('trash-empty-btn').addEventListener('click', async () => {
-      const ok = await this.confirmDialog(i18n.t('trash_empty_title'), i18n.t('trash_empty_desc'), i18n.t('trash_empty_confirm'), i18n.t('cancel'), true);
-      if (!ok) return;
+      const choice = await this.threeWayDialog(
+        i18n.t('trash_empty_title'),
+        i18n.t('trash_empty_desc'),
+        [
+          { label: i18n.t('cancel'), value: 'cancel', className: 'btn-success' },
+          { label: i18n.t('trash_empty_confirm'), value: 'empty', className: 'btn-danger', hold: true }
+        ],
+        true
+      );
+      if (choice !== 'empty') return;
       await DB.clearTrash();
       await this.renderTrash();
       this.toast(i18n.t('trash_emptied'));
@@ -2275,10 +2328,9 @@ const App = {
           this.showAutoNotice(i18n.t('nothing_to_show'));
           return;
         }
-        this.currentCategoryFilter = cat.id;
         document.getElementById('search-input').value = '';
-        this.renderCategoryChips();
-        await this.renderCardsList();
+        document.getElementById('search-clear-btn').hidden = true;
+        await this.switchCategoryFilter(cat.id);
         this.showView('view-cards');
       });
 
@@ -2382,12 +2434,32 @@ const App = {
     this.toast(i18n.t('empty_cats_done', { count: empty.length }));
   },
 
+  // Short "restoring your data" animation, so a restore feels like something happened
+  // instead of the screen simply blinking.
+  showRestoreOverlay(text) {
+    const el = document.getElementById('restore-overlay');
+    if (!el) return;
+    document.getElementById('restore-overlay-text').textContent = text || i18n.t('restore_progress');
+    const bar = document.getElementById('restore-overlay-bar');
+    bar.style.animation = 'none';
+    void bar.offsetWidth;
+    bar.style.animation = '';
+    el.hidden = false;
+  },
+
+  hideRestoreOverlay() {
+    const el = document.getElementById('restore-overlay');
+    if (el) el.hidden = true;
+  },
+
   async handleImportPayload(payload) {
     const isEmpty = await DB.isEmpty();
     let mode = 'merge';
     if (!isEmpty) {
       mode = await this.choiceDialog(i18n.t('import_merge_title'), i18n.t('import_merge_desc'), i18n.t('import_merge'), i18n.t('import_replace'));
     }
+    this.showRestoreOverlay(i18n.t('restore_progress'));
+    const startedAt = Date.now();
     await Backup.applyImport(payload, mode);
     await this.ensureDefaultCategories();
     await this.dedupeCategories();
@@ -2397,6 +2469,11 @@ const App = {
     this.renderCategorySelect();
     this.renderSettingsCategories();
     await this.renderCardsList();
+    await this.renderTrash();
+    // Let the animation run for at least a moment even when the import is instant.
+    const elapsed = Date.now() - startedAt;
+    if (elapsed < 1400) await new Promise((r) => setTimeout(r, 1400 - elapsed));
+    this.hideRestoreOverlay();
     this.toast(i18n.t('restore_action'));
     await this.offerRemoveEmptyCategories();
   },

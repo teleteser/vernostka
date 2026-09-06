@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Vernostka - verzia v24 -->
+<!-- Vernostka - verzia v25 -->
 <html lang="sk">
 <head>
 <meta charset="UTF-8">
@@ -34,8 +34,9 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>
         </button>
       </div>
-      <button id="sort-btn" class="icon-btn" aria-label="Sort" title="Sort">
+      <button id="sort-btn" class="icon-btn sort-btn" aria-label="Sort" title="Sort">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M6 12h12M10 18h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span id="sort-label" class="sort-label"></span>
       </button>
       <button id="select-mode-btn" class="icon-btn" aria-label="Select multiple" title="Select multiple">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><path d="M15.5 16.3l1.6 1.6 3.2-3.4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -157,13 +158,13 @@
         <p id="last-backup-status" class="hint"></p>
         <div class="btn-row">
           <button id="backup-now-btn" class="btn btn-success" data-i18n="backup_now">Zalohovat teraz</button>
-          <button id="export-backup-btn" class="btn btn-accent" data-i18n="backup_export_manual">Exportovat zalohu</button>
+          <button id="import-backup-btn" class="btn btn-blue" data-i18n="backup_import">Obnovit zo zalohy</button>
         </div>
-        <button id="send-all-qr-btn" class="btn btn-qr" data-i18n="send_all_qr">
+        <button id="send-all-qr-btn" class="btn btn-qr btn-qr-green" data-i18n="send_all_qr">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><path d="M14 14h3v3h-3zM19 19h2v2h-2zM14 19h2v2h-2zM19 14h2v2h-2z" fill="currentColor"/></svg>
           <span data-i18n="send_all_qr">Prenos vsetkych kariet cez QR</span>
         </button>
-        <button id="import-backup-btn" class="btn btn-primary" data-i18n="backup_import">Obnovit zo zalohy</button>
+        <button id="export-backup-btn" class="btn btn-accent" data-i18n="backup_export_manual">Exportovat zalohu (subor)</button>
         <input type="file" id="import-file-input" accept="application/json,.json,.txt,text/plain" hidden>
       </div>
 
@@ -184,6 +185,7 @@
 
       <div class="settings-group">
         <h3 data-i18n="settings_about">O appke</h3>
+        <p class="app-version">Vernostka_v25 &copy; 06.09.2026 10:36 Vojta</p>
         <p class="hint">Vernostka - offline sprava vernostnych kariet. Ziadny ucet, ziadny cloud, ziadne sledovanie.</p>
       </div>
     </div>
@@ -262,7 +264,7 @@
         <label class="field-label" data-i18n="store_name_label">Nazov obchodu</label>
         <div class="store-name-row">
           <div id="store-logo-preview" class="store-logo-preview"></div>
-          <input type="text" id="field-store-name" name="vk-store-name" autocomplete="new-password" autocorrect="off" autocapitalize="words" spellcheck="false" data-lpignore="true" data-i18n-placeholder="store_name_placeholder" placeholder="napr. Lidl">
+          <input type="text" id="field-store-name" name="vk-f1" autocomplete="one-time-code" autocorrect="off" autocapitalize="words" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-i18n-placeholder="store_name_placeholder" placeholder="napr. Lidl">
         </div>
         <div id="store-suggestions" class="store-suggestions"></div>
 
@@ -393,10 +395,10 @@
       <h3 data-i18n="send_title">Zdielat karty</h3>
       <p id="send-method-desc"></p>
       <div class="btn-row">
-        <button id="send-via-file-btn" class="btn btn-secondary" data-i18n="send_via_file">Zdielat subor</button>
+        <button id="send-via-qr-btn" class="btn btn-success" data-i18n="send_via_qr" hidden>Zobrazit ako QR kod</button>
       </div>
       <div class="btn-row">
-        <button id="send-via-qr-btn" class="btn btn-secondary" data-i18n="send_via_qr" hidden>Zobrazit ako QR kod</button>
+        <button id="send-via-file-btn" class="btn btn-success-soft" data-i18n="send_via_file">Zdielat subor</button>
       </div>
       <div class="btn-row">
         <button id="send-method-cancel-btn" class="btn btn-danger" data-i18n="cancel">Zrusit</button>
@@ -468,6 +470,20 @@
         <button id="install-later-btn" class="btn btn-ghost" data-i18n="install_later">Neskor</button>
         <button id="install-dismiss-btn" class="btn btn-ghost" data-i18n="install_dismiss">Uz nezobrazovat</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ===================== RESTORE ANIMATION ===================== -->
+  <div id="restore-overlay" class="restore-overlay" hidden>
+    <div class="restore-card">
+      <div class="restore-icon">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+          <path d="M4 12a8 8 0 1 1 2.3 5.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M4 20v-5h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <p id="restore-overlay-text" data-i18n="restore_progress">Obnovujem data zo zalohy...</p>
+      <div class="restore-bar"><div id="restore-overlay-bar" class="restore-bar-fill"></div></div>
     </div>
   </div>
 
