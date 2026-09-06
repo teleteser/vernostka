@@ -1,4 +1,4 @@
-// Vernostka main app controller - verzia v26
+// Vernostka main app controller - verzia v27
 
 // Chrome fires beforeinstallprompt very early - often before the app has finished starting
 // up - and only once. Catch it here, at script level, so the "Install now" button in the
@@ -52,6 +52,7 @@ const App = {
     this.applyGpsToDom();
     this.applySearchScopeToDom();
     this.applyRecentFirstToDom();
+    this.applyAppTitleToDom();
     this.updateSortLabel();
     this.updateInstallStatusUI();
     this.purgeOldTrash().then(() => this.renderTrash());
@@ -120,6 +121,8 @@ const App = {
     // Each category remembers how it was sorted the last time it was open.
     this.sortByCategory = await DB.getSetting('sortByCategory', {}) || {};
     this.defaultSort = this.currentSort;
+    this.appTitle = await DB.getSetting('appTitle', '');
+    this.showAppTitle = await DB.getSetting('showAppTitle', true);
     if (this.sortByCategory[this.currentCategoryFilter]) this.currentSort = this.sortByCategory[this.currentCategoryFilter];
   },
 
@@ -130,6 +133,19 @@ const App = {
     }
     document.documentElement.setAttribute('data-theme', effective);
     document.querySelectorAll('#theme-segmented button').forEach((b) => b.classList.toggle('active', b.dataset.value === this.theme));
+  },
+
+  // The heading above the card list: own name, or hidden entirely.
+  applyAppTitleToDom() {
+    const el = document.getElementById('app-title');
+    const header = el ? el.closest('.topbar') : null;
+    const name = (this.appTitle && this.appTitle.trim()) || i18n.t('appName');
+    if (el) el.textContent = name;
+    if (header) header.hidden = !this.showAppTitle;
+    const input = document.getElementById('app-title-input');
+    if (input && document.activeElement !== input) input.value = this.appTitle || '';
+    const check = document.getElementById('app-title-show');
+    if (check) check.checked = !!this.showAppTitle;
   },
 
   applyRecentFirstToDom() {
@@ -166,6 +182,7 @@ const App = {
     this.applyGpsToDom();
     this.applySearchScopeToDom();
     this.applyRecentFirstToDom();
+    this.applyAppTitleToDom();
     const qrPlayBtn = document.getElementById('send-qr-play-btn');
     if (qrPlayBtn) qrPlayBtn.textContent = i18n.t(this._bulkQrPlaying ? 'send_qr_pause' : 'send_qr_play');
     this.renderCategoryChips();
@@ -878,6 +895,7 @@ const App = {
     return row;
   },
 
+  APP_URL: 'https://teleteser.github.io/vernostka',
   LONG_PRESS_MS: 550,
   HOLD_CONFIRM_MS: 1400,
 
@@ -1057,7 +1075,7 @@ const App = {
   // Keeping the field read-only until it is actually tapped stops that menu from appearing
   // while still opening the keyboard normally.
   bindNoAutofillFields() {
-    ['field-store-name', 'field-code'].forEach((id) => {
+    ['field-store-name', 'field-code', 'app-title-input'].forEach((id) => {
       const el = document.getElementById(id);
       if (!el) return;
       const unlock = () => {
@@ -2100,7 +2118,7 @@ const App = {
       await DB.clearTrash();
       await this.renderTrash();
       const elapsed = Date.now() - startedAt;
-      if (elapsed < 1400) await new Promise((r) => setTimeout(r, 1400 - elapsed));
+      if (elapsed < 2100) await new Promise((r) => setTimeout(r, 2100 - elapsed));
       this.hideRestoreOverlay();
       this.toast(i18n.t('trash_emptied'));
     });
@@ -2133,6 +2151,33 @@ const App = {
       this.searchNoteDismissed = document.getElementById('search-scope-dismiss').checked;
       await DB.setSetting('searchNoteDismissed', this.searchNoteDismissed);
       await this.renderCardsList();
+    });
+
+    document.getElementById('app-title-save').addEventListener('click', async () => {
+      const input = document.getElementById('app-title-input');
+      this.appTitle = input.value.trim();
+      await DB.setSetting('appTitle', this.appTitle);
+      input.blur();
+      this.applyAppTitleToDom();
+      this.toast(i18n.t('app_title_saved'));
+    });
+    document.getElementById('app-title-show').addEventListener('change', async (e) => {
+      this.showAppTitle = e.target.checked;
+      await DB.setSetting('showAppTitle', this.showAppTitle);
+      this.applyAppTitleToDom();
+    });
+
+    // QR code with the app's web address, so it can be installed on another phone by
+    // pointing its camera at this screen.
+    document.getElementById('show-app-qr-btn').addEventListener('click', () => {
+      const wrap = document.getElementById('app-qr-wrap');
+      const showing = wrap.hidden;
+      wrap.hidden = !showing;
+      document.getElementById('show-app-qr-btn').textContent = i18n.t(showing ? 'app_qr_hide' : 'app_qr_button');
+      if (!showing) return;
+      const holder = document.getElementById('app-qr');
+      const size = Math.min(Math.max(Math.floor(holder.clientWidth || 260), 220), 420);
+      renderCode(holder, this.APP_URL, 'QR', { width: size, height: size, correctLevel: 'M' });
     });
 
     document.getElementById('settings-install-btn').addEventListener('click', () => this.openInstallSheet());
