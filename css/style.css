@@ -206,12 +206,14 @@ p { margin: 0.35em 0; }
   box-shadow: 0 8px 20px rgba(0,0,0,0.25);
 }
 .selection-bar-row { display: flex; align-items: center; gap: 10px; }
-.selection-bar #selection-count { font-weight: 700; font-size: 14px; }
-.selection-bar .btn { width: auto; flex: 1; }
-.selection-bar .btn-secondary { background: rgba(255,255,255,0.15); color: #fff; border: none; }
-.selection-bar .btn-ghost { color: rgba(255,255,255,0.85); flex: 0 0 auto; }
-.selection-bar-row:first-child #selection-count { flex: 0 0 auto; }
-.selection-bar-row:first-child .btn-ghost:last-child { margin-left: auto; }
+.selection-bar-title {
+  display: flex; align-items: baseline; justify-content: center; gap: 8px;
+  font-size: 15px; font-weight: 700; padding: 2px 0 6px;
+}
+.selection-bar-title strong { font-size: 22px; font-weight: 800; }
+.selection-bar .btn { width: auto; flex: 1; font-size: 15px; font-weight: 700; padding: 13px 10px; }
+.selection-bar .btn-light { background: #fff; color: var(--primary); border: none; }
+.selection-bar .btn-danger { background: var(--danger); color: #fff; border: none; }
 
 .send-qr-container { width: min(100%, 620px); background: #fff; border-radius: 12px; padding: 8px; display: flex; align-items: center; justify-content: center; }
 .send-qr-container .qr-holder { width: 100%; }
@@ -483,9 +485,14 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 .code-card-btn { width: 100%; border: none; background: none; padding: 0; display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
 .tap-hint { font-size: 12.5px; color: var(--text-muted); font-weight: 600; }
 
-.detail-actions-row { display: flex; gap: 10px; margin: 0 0 16px; }
-.stat-pill { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 8px; text-align: center; }
+.detail-actions-row { display: flex; gap: 8px; margin: 0 0 16px; align-items: stretch; }
+.stat-pill { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 6px; text-align: center; }
+/* "Last used" holds a whole date + time, so it gets roughly half the row and never breaks
+   the date apart; the other two only hold a short value. */
+.stat-pill-wide { flex: 2 1 0; }
+.stat-pill-narrow { flex: 1 1 0; }
 .stat-pill strong { display: block; font-size: 18px; color: var(--primary); }
+#detail-last-used { font-size: 14px; line-height: 1.35; white-space: normal; word-break: keep-all; }
 [data-theme="dark"] .stat-pill strong { color: #EAF0F6; }
 .stat-pill span { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
 .stat-pill.pill-button { border: none; font-weight: 700; font-size: 13.5px; color: var(--accent); background: var(--surface); display: flex; align-items: center; justify-content: center; }
@@ -758,3 +765,18 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 }
 .btn.btn-hold.holding::after { animation: hold-fill var(--hold-duration, 1400ms) linear forwards; }
 @keyframes hold-fill { to { width: 100%; } }
+
+/* Green confirmation button */
+.btn-success { background: var(--success); color: #fff; border: 1px solid var(--success); }
+
+/* Bigger, clearer banner (e.g. "unsaved changes") */
+.banner-big { padding: 16px 18px; gap: 6px; }
+.banner-big strong { font-size: 17px; }
+.banner-big p { font-size: 14.5px; line-height: 1.45; }
+.banner-big .banner-actions { display: flex; gap: 10px; margin-top: 10px; align-items: stretch; }
+.banner .banner-actions .banner-btn { border-radius: 10px; border: none; font-weight: 800; font-size: 15px; padding: 12px 14px; }
+.banner .banner-actions .banner-btn-close { background: var(--danger); color: #fff; flex: 0 0 52px; font-size: 17px; }
+.banner .banner-actions .banner-btn-action { background: var(--success); color: #fff; flex: 1; }
+
+/* Total card count next to the categories heading in settings */
+.settings-total { font-weight: 600; color: var(--text-muted); text-transform: none; }

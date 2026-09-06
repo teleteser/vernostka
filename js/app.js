@@ -1,4 +1,4 @@
-// Vernostka main app controller - verzia v21
+// Vernostka main app controller - verzia v22
 
 // Chrome fires beforeinstallprompt very early - often before the app has finished starting
 // up - and only once. Catch it here, at script level, so the "Install now" button in the
@@ -1988,6 +1988,8 @@ const App = {
     const el = document.getElementById('settings-category-list');
     const allCards = await DB.getAllCards();
     const countFor = (id) => allCards.filter((c) => this.cardCategoryIds(c).indexOf(id) !== -1).length;
+    const totalEl = document.getElementById('settings-cards-total');
+    if (totalEl) totalEl.textContent = i18n.t('settings_cards_total', { count: allCards.length });
     el.innerHTML = '';
     this.categories.forEach((cat, idx) => {
       const row = document.createElement('div');
@@ -2336,8 +2338,16 @@ const App = {
   // Generic 2-or-3-button sheet. buttons: [{label, value, className}]. Resolves with the
   // clicked button's value. Rebuilds the confirm sheet's default two buttons afterwards so
   // confirmDialog()/choiceDialog() keep working normally on subsequent calls.
-  infoDialog(title, desc) {
-    return this.threeWayDialog(title, desc, [{ label: i18n.t('ok'), value: 'ok', className: 'btn-primary' }]);
+  // Confirmation that needs no decision: green OK, and it closes itself after 10 seconds so
+  // it never stands in the way.
+  infoDialog(title, desc, autoCloseMs = 10000) {
+    const promise = this.threeWayDialog(title, desc, [{ label: i18n.t('ok'), value: 'ok', className: 'btn-success' }]);
+    clearTimeout(this._infoAutoCloseTimer);
+    this._infoAutoCloseTimer = setTimeout(() => {
+      const okBtn = document.querySelector('#modal-confirm .btn-row .btn-success');
+      if (okBtn && !document.getElementById('modal-confirm').hidden) okBtn.click();
+    }, autoCloseMs);
+    return promise;
   },
 
   threeWayDialog(title, desc, buttons, danger = false, big = danger) {
@@ -2405,20 +2415,25 @@ const App = {
   showBanner(title, desc, actions) {
     const area = document.getElementById('banner-area');
     const el = document.createElement('div');
-    el.className = 'banner';
+    el.className = 'banner banner-big';
     el.innerHTML = `<strong>${this.escapeHtml(title)}</strong><p>${this.escapeHtml(desc)}</p>`;
     const actionsRow = document.createElement('div');
     actionsRow.className = 'banner-actions';
+    // Dismiss on the left in red, the action on the right in green - the same left/right
+    // arrangement as everywhere else in the app.
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'banner-btn banner-btn-close';
+    closeBtn.textContent = '✕';
+    closeBtn.setAttribute('aria-label', i18n.t('cancel'));
+    closeBtn.addEventListener('click', () => el.remove());
+    actionsRow.appendChild(closeBtn);
     actions.forEach((a) => {
       const btn = document.createElement('button');
+      btn.className = 'banner-btn banner-btn-action';
       btn.textContent = a.label;
       btn.addEventListener('click', async () => { await a.action(); el.remove(); });
       actionsRow.appendChild(btn);
     });
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = '✕';
-    closeBtn.addEventListener('click', () => el.remove());
-    actionsRow.appendChild(closeBtn);
     el.appendChild(actionsRow);
     area.appendChild(el);
   }

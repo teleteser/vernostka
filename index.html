@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Vernostka - verzia v21 -->
+<!-- Vernostka - verzia v22 -->
 <html lang="sk">
 <head>
 <meta charset="UTF-8">
@@ -44,14 +44,17 @@
     <div id="cards-list" class="cards-list"></div>
 
     <div id="selection-bar" class="selection-bar" hidden>
-      <div class="selection-bar-row">
-        <span id="selection-count">0</span>
-        <button id="selection-select-all-btn" class="btn btn-ghost small" data-i18n="select_all_visible">Vybrat vsetky</button>
-        <button id="selection-cancel-btn" class="btn btn-ghost small" data-i18n="cancel">Zrusit</button>
+      <div class="selection-bar-title">
+        <span data-i18n="selection_count_label">Vybrany pocet:</span>
+        <strong id="selection-count">0</strong>
       </div>
       <div class="selection-bar-row">
-        <button id="selection-assign-btn" class="btn btn-secondary small" data-i18n="bulk_assign_button">Priradit kategoriu</button>
-        <button id="selection-send-btn" class="btn btn-secondary small" data-i18n="send_button">Odoslat</button>
+        <button id="selection-select-all-btn" class="btn btn-light" data-i18n="select_all_visible">Vybrat vsetky</button>
+        <button id="selection-cancel-btn" class="btn btn-danger" data-i18n="cancel">Zrusit</button>
+      </div>
+      <div class="selection-bar-row">
+        <button id="selection-assign-btn" class="btn btn-light" data-i18n="bulk_assign_button">Priradit kategoriu</button>
+        <button id="selection-send-btn" class="btn btn-light" data-i18n="send_button">Zdielat</button>
       </div>
     </div>
 
@@ -118,7 +121,7 @@
       </div>
 
       <div class="settings-group">
-        <h3 data-i18n="settings_categories">Kategorie</h3>
+        <h3><span data-i18n="settings_categories">Kategorie</span> <span id="settings-cards-total" class="settings-total"></span></h3>
         <div id="settings-category-list" class="settings-category-list"></div>
         <button id="settings-add-category" class="btn btn-ghost" data-i18n="category_add_new">+ Pridat vlastnu kategoriu</button>
       </div>
@@ -297,9 +300,9 @@
       </button>
 
       <div class="detail-actions-row">
-        <div class="stat-pill"><span data-i18n="combined_uses_label">Zobrazene</span><strong id="detail-uses">0 x</strong></div>
-        <div class="stat-pill"><span data-i18n="last_used">Naposledy</span><strong id="detail-last-used">-</strong></div>
-        <button id="toggle-history-btn" class="stat-pill pill-button" data-i18n="history_title">Historia</button>
+        <div class="stat-pill stat-pill-narrow"><span data-i18n="combined_uses_label">Zobrazene</span><strong id="detail-uses">0 x</strong></div>
+        <div class="stat-pill stat-pill-wide"><span data-i18n="last_used">Naposledy</span><strong id="detail-last-used">-</strong></div>
+        <button id="toggle-history-btn" class="stat-pill pill-button stat-pill-narrow" data-i18n="history_title">Historia</button>
       </div>
 
       <div id="detail-history-section" hidden>
@@ -351,7 +354,7 @@
   <!-- ===================== SEND CARDS METHOD DIALOG ===================== -->
   <div id="modal-send-method" class="modal-overlay" hidden>
     <div class="modal-sheet">
-      <h3 data-i18n="send_title">Odoslat karty</h3>
+      <h3 data-i18n="send_title">Zdielat karty</h3>
       <p id="send-method-desc"></p>
       <div class="btn-row">
         <button id="send-via-file-btn" class="btn btn-secondary" data-i18n="send_via_file">Zdielat subor</button>
@@ -359,7 +362,9 @@
       <div class="btn-row">
         <button id="send-via-qr-btn" class="btn btn-secondary" data-i18n="send_via_qr" hidden>Zobrazit ako QR kod</button>
       </div>
-      <button id="send-method-cancel-btn" class="btn btn-ghost" data-i18n="cancel">Zrusit</button>
+      <div class="btn-row">
+        <button id="send-method-cancel-btn" class="btn btn-danger" data-i18n="cancel">Zrusit</button>
+      </div>
     </div>
   </div>
 
