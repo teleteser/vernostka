@@ -1,4 +1,4 @@
-// Vernostka main app controller - verzia v23
+// Vernostka main app controller - verzia v24
 
 // Chrome fires beforeinstallprompt very early - often before the app has finished starting
 // up - and only once. Catch it here, at script level, so the "Install now" button in the
@@ -50,7 +50,9 @@ const App = {
     this.applyVibrationToDom();
     this.applyGpsToDom();
     this.applySearchScopeToDom();
+    this.applyRecentFirstToDom();
     this.updateInstallStatusUI();
+    this.purgeOldTrash().then(() => this.renderTrash());
     this.renderCategoryChips();
     this.renderCategorySelect();
     this.renderSettingsCategories();
@@ -110,6 +112,9 @@ const App = {
     // 'all' = typing in the search box looks through every card, whatever category chip is
     // selected; 'category' = search stays inside the selected category.
     this.searchScope = await DB.getSetting('searchScope', 'all');
+    // In "most used" order, cards opened today/yesterday are lifted to the top.
+    this.recentFirst = await DB.getSetting('recentFirst', true);
+    this.searchNoteDismissed = await DB.getSetting('searchNoteDismissed', false);
   },
 
   applyTheme() {
@@ -119,6 +124,12 @@ const App = {
     }
     document.documentElement.setAttribute('data-theme', effective);
     document.querySelectorAll('#theme-segmented button').forEach((b) => b.classList.toggle('active', b.dataset.value === this.theme));
+  },
+
+  applyRecentFirstToDom() {
+    document.querySelectorAll('#recent-first-segmented button').forEach((b) => {
+      b.classList.toggle('active', (b.dataset.value === 'on') === !!this.recentFirst);
+    });
   },
 
   applySearchScopeToDom() {
@@ -148,6 +159,7 @@ const App = {
     this.applyVibrationToDom();
     this.applyGpsToDom();
     this.applySearchScopeToDom();
+    this.applyRecentFirstToDom();
     const qrPlayBtn = document.getElementById('send-qr-play-btn');
     if (qrPlayBtn) qrPlayBtn.textContent = i18n.t(this._bulkQrPlaying ? 'send_qr_pause' : 'send_qr_play');
     this.renderCategoryChips();
@@ -215,6 +227,76 @@ const App = {
       }
     }
     return changed;
+  },
+
+  // ---- Trash ----
+  // Nothing is deleted outright: cards and categories are parked in the trash first, so a
+  // wrong tap (or a backup that did not work out) can always be undone. Entries older than
+  // TRASH_KEEP_DAYS are cleared out silently on startup.
+  TRASH_KEEP_DAYS: 30,
+
+  async trashCard(card) {
+    if (!card) return;
+    await DB.putTrash({ id: 'trash-' + DB.uid(), kind: 'card', data: card, deletedAt: Date.now() });
+    await DB.deleteCard(card.id);
+  },
+
+  async trashCategory(cat) {
+    if (!cat) return;
+    await DB.putTrash({ id: 'trash-' + DB.uid(), kind: 'category', data: cat, deletedAt: Date.now() });
+    await DB.deleteCategory(cat.id);
+  },
+
+  async purgeOldTrash() {
+    const cutoff = Date.now() - this.TRASH_KEEP_DAYS * 24 * 3600 * 1000;
+    const entries = await DB.getAllTrash();
+    for (const e of entries) {
+      if ((e.deletedAt || 0) < cutoff) await DB.deleteTrashEntry(e.id);
+    }
+  },
+
+  async restoreTrashEntry(id) {
+    const entry = await DB.getTrashEntry(id);
+    if (!entry) return;
+    if (entry.kind === 'card') await DB.putCard(entry.data);
+    else await DB.putCategory(entry.data);
+    await DB.deleteTrashEntry(id);
+    await this.loadCategories();
+    this.renderCategoryChips();
+    this.renderCategorySelect();
+    await this.renderCardsList();
+    await this.renderSettingsCategories();
+    await this.renderTrash();
+  },
+
+  async renderTrash() {
+    const listEl = document.getElementById('trash-list');
+    if (!listEl) return;
+    const entries = await DB.getAllTrash();
+    entries.sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0));
+    document.getElementById('trash-count').textContent = i18n.t('trash_count', { count: entries.length });
+    document.getElementById('trash-empty-btn').hidden = entries.length === 0;
+    document.getElementById('trash-restore-all-btn').hidden = entries.length === 0;
+    listEl.innerHTML = '';
+    if (entries.length === 0) {
+      listEl.innerHTML = `<p class="hint">${i18n.t('trash_empty_hint')}</p>`;
+      return;
+    }
+    entries.slice(0, 200).forEach((e) => {
+      const row = document.createElement('div');
+      row.className = 'trash-row';
+      const name = e.kind === 'card'
+        ? (e.data.storeName || i18n.t('untitled_card'))
+        : (e.data.name || (e.data.builtin ? i18n.t(e.data.builtin) : ''));
+      row.innerHTML = `<div class="trash-row-info"><strong>${this.escapeHtml(name)}</strong>
+        <span class="hint">${i18n.t(e.kind === 'card' ? 'trash_kind_card' : 'trash_kind_category')} · ${this.formatLastUsedHtml(e.deletedAt)}</span></div>`;
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-success small';
+      btn.textContent = i18n.t('trash_restore');
+      btn.addEventListener('click', () => this.restoreTrashEntry(e.id));
+      row.appendChild(btn);
+      listEl.appendChild(row);
+    });
   },
 
   // ---- Card categories ----
@@ -303,7 +385,30 @@ const App = {
 
   // ---------------- Cards view ----------------
   bindCardsView() {
-    document.getElementById('search-input').addEventListener('input', () => this.renderCardsList());
+    document.getElementById('search-input').addEventListener('input', () => {
+      document.getElementById('search-clear-btn').hidden = !document.getElementById('search-input').value;
+      this.renderCardsList();
+    });
+    document.getElementById('search-clear-btn').addEventListener('click', () => {
+      const input = document.getElementById('search-input');
+      input.value = '';
+      input.blur();
+      document.getElementById('search-clear-btn').hidden = true;
+      this.renderCardsList();
+    });
+    document.getElementById('search-scope-note').addEventListener('click', () => {
+      // Take the focus off the search field first - otherwise Android keeps its own search
+      // suggestion popup open on top of the settings screen.
+      const input = document.getElementById('search-input');
+      input.blur();
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      this.showView('view-settings');
+      const group = document.getElementById('search-settings-group');
+      group.scrollIntoView({ block: 'center' });
+      group.classList.remove('settings-flash');
+      void group.offsetWidth;
+      group.classList.add('settings-flash');
+    });
     document.getElementById('fab-add').addEventListener('click', () => this.openAddCard());
     document.getElementById('empty-add-btn').addEventListener('click', () => this.openAddCard());
     document.getElementById('sort-btn').addEventListener('click', () => this.cycleSort());
@@ -644,7 +749,7 @@ const App = {
       return true;
     });
     const scopeNote = document.getElementById('search-scope-note');
-    if (scopeNote) scopeNote.hidden = !(ignoreCategory && this.currentCategoryFilter !== 'all');
+    if (scopeNote) scopeNote.hidden = !(ignoreCategory && this.currentCategoryFilter !== 'all' && !this.searchNoteDismissed);
 
     filtered = this.sortCards(filtered);
     this._lastFilteredCardIds = filtered.map((c) => c.id);
@@ -672,6 +777,11 @@ const App = {
         const d2 = this.userPos ? Geo.nearestLocation(this.userPos, c2.locations || []) : Infinity;
         cmp = d1 - d2;
       } else { // frequency - same number the card row shows (opened + code shown)
+        if (this.recentFirst) {
+          // Cards used today come first, then yesterday's, then all the rest.
+          const r1 = this.recencyRank(c1), r2 = this.recencyRank(c2);
+          if (r1 !== r2) return r1 - r2;
+        }
         cmp = this.cardActivityCount(c2) - this.cardActivityCount(c1);
         // Same count: the more recently used card comes first.
         if (cmp === 0) cmp = (this.mostRecentActivity(c2) || 0) - (this.mostRecentActivity(c1) || 0);
@@ -830,6 +940,15 @@ const App = {
 
   cardActivityCount(card) { return (card.useCount || 0) + (card.detailOpenCount || 0); },
 
+  // 0 = used today, 1 = yesterday, 2 = anything older or never used.
+  recencyRank(card) {
+    const ts = this.mostRecentActivity(card);
+    const label = this.dayLabelFor(ts);
+    if (label === i18n.t('day_today')) return 0;
+    if (label === i18n.t('day_yesterday')) return 1;
+    return 2;
+  },
+
   initialLetter(name) { return (name || '?').trim().charAt(0).toUpperCase(); },
   mostRecentActivity(card) {
     const a = card.lastUsedAt || 0;
@@ -967,7 +1086,8 @@ const App = {
         i18n.t('delete'), i18n.t('cancel'), true
       );
       if (!ok) return;
-      await DB.deleteCard(this.editingCard.id);
+      // Into the trash rather than gone: it can be restored from Settings.
+      await this.trashCard(await DB.getCard(this.editingCard.id) || this.editingCard);
       this.stopScanning();
       this.hideModal('modal-edit');
       this.hideModal('modal-detail');
@@ -1891,6 +2011,44 @@ const App = {
       });
     });
 
+    document.getElementById('trash-empty-btn').addEventListener('click', async () => {
+      const ok = await this.confirmDialog(i18n.t('trash_empty_title'), i18n.t('trash_empty_desc'), i18n.t('trash_empty_confirm'), i18n.t('cancel'), true);
+      if (!ok) return;
+      await DB.clearTrash();
+      await this.renderTrash();
+      this.toast(i18n.t('trash_emptied'));
+    });
+    document.getElementById('trash-restore-all-btn').addEventListener('click', async () => {
+      const entries = await DB.getAllTrash();
+      for (const e of entries) {
+        if (e.kind === 'card') await DB.putCard(e.data);
+        else await DB.putCategory(e.data);
+        await DB.deleteTrashEntry(e.id);
+      }
+      await this.loadCategories();
+      this.renderCategoryChips();
+      this.renderCategorySelect();
+      await this.renderCardsList();
+      await this.renderSettingsCategories();
+      await this.renderTrash();
+      this.toast(i18n.t('trash_restored', { count: entries.length }));
+    });
+
+    document.querySelectorAll('#recent-first-segmented button').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        this.recentFirst = btn.dataset.value === 'on';
+        await DB.setSetting('recentFirst', this.recentFirst);
+        this.applyRecentFirstToDom();
+        await this.renderCardsList();
+      });
+    });
+
+    document.getElementById('search-scope-dismiss').addEventListener('click', async () => {
+      this.searchNoteDismissed = document.getElementById('search-scope-dismiss').checked;
+      await DB.setSetting('searchNoteDismissed', this.searchNoteDismissed);
+      await this.renderCardsList();
+    });
+
     document.getElementById('settings-install-btn').addEventListener('click', () => this.openInstallSheet());
 
     document.querySelectorAll('#gps-segmented button').forEach((btn) => {
@@ -2002,9 +2160,31 @@ const App = {
       );
       if (!choice || choice === 'cancel') return;
       if (choice === 'backup') {
-        if (Backup.hasActiveFolderPermission()) await Backup.writeBackupToFolder();
-        else await Backup.exportToFile();
+        // Save the backup FIRST and let the person confirm it really landed - erasing after
+        // a backup that silently failed is how data gets lost for good.
+        let savedName = null;
+        try {
+          savedName = Backup.hasActiveFolderPermission()
+            ? await Backup.writeBackupToFolder()
+            : await Backup.downloadBackupFile();
+        } catch (e) {
+          savedName = null;
+        }
         this.updateBackupStatusUI();
+        if (!savedName) {
+          await this.infoDialog(i18n.t('backup_failed_title'), i18n.t('backup_failed_desc'), 20000);
+          return;
+        }
+        const go = await this.confirmDialog(
+          i18n.t('backup_saved_title'),
+          (Backup.hasActiveFolderPermission()
+            ? i18n.t('backup_saved_folder', { file: savedName, folder: Backup.dirHandle.name })
+            : i18n.t('backup_saved_downloads', { file: savedName })) + ' ' + i18n.t('reset_after_backup_check'),
+          i18n.t('reset_continue'),
+          i18n.t('cancel'),
+          true
+        );
+        if (!go) return;
       }
       // Categories are a separate decision - some people want to keep their own structure
       // and start filling it again with new cards.
@@ -2014,9 +2194,13 @@ const App = {
         i18n.t('reset_categories_delete'),
         i18n.t('reset_categories_keep')
       );
+      // Everything goes to the trash first, so even this can be undone.
+      const allCards = await DB.getAllCards();
+      for (const c of allCards) await this.trashCard(c);
       await DB.replaceAllCards([]);
       await DB.replaceAllHistory([]);
       if (alsoCategories) {
+        for (const cat of this.categories) await this.trashCategory(cat);
         await DB.replaceAllCategories([]);
         // Do not let the built-in categories reappear on the next start.
         await DB.setSetting('defaultCategoriesSeeded', true);
@@ -2026,7 +2210,9 @@ const App = {
       }
       this.renderSettingsCategories();
       await this.renderCardsList();
+      await this.renderTrash();
       this.toast(i18n.t('settings_reset'));
+      await this.infoDialog(i18n.t('trash_moved_title'), i18n.t('trash_moved_desc', { days: this.TRASH_KEEP_DAYS }), 15000);
     });
   },
 
@@ -2155,10 +2341,10 @@ const App = {
           }
         } else if (choice === 'delete') {
           if (count > 0) {
-            for (const c of affected) await DB.deleteCard(c.id);
+            for (const c of affected) await this.trashCard(c);
           }
         }
-        await DB.deleteCategory(cat.id);
+        await this.trashCategory(cat);
         await this.loadCategories();
         this.renderSettingsCategories();
         this.renderCategoryChips();
@@ -2187,7 +2373,7 @@ const App = {
       i18n.t('empty_cats_keep')
     );
     if (!ok) return;
-    for (const cat of empty) await DB.deleteCategory(cat.id);
+    for (const cat of empty) await this.trashCategory(cat);
     await this.loadCategories();
     this.renderCategoryChips();
     this.renderCategorySelect();
@@ -2365,6 +2551,10 @@ const App = {
     el.style.height = '';
     el.style.top = '';
     el.hidden = false;
+    // Always open at the top: a modal that reopened where it was last scrolled to (the
+    // camera pane out of sight, for example) is confusing.
+    el.scrollTop = 0;
+    el.querySelectorAll('.modal-body, .modal-scroll').forEach((bodyEl) => { bodyEl.scrollTop = 0; });
     this.updateBodyScrollLock();
   },
   hideModal(id) {

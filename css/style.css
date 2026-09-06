@@ -807,3 +807,63 @@ body.modal-open #app { overflow: hidden; }
   .send-qr-controls .hint.center { display: none; }
   .send-qr-controls .btn-primary { padding: 12px; font-size: 15px; }
 }
+
+/* Clear the search field */
+.search-clear-btn {
+  flex-shrink: 0;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: var(--danger);
+  display: flex; align-items: center; justify-content: center;
+}
+.search-clear-btn:active { opacity: 0.75; }
+
+/* Tappable note under the search box */
+.search-scope-note {
+  display: block;
+  width: calc(100% - 40px);
+  margin: 0 20px 8px;
+  padding: 9px 12px;
+  border: 1px dashed var(--accent);
+  border-radius: 10px;
+  background: rgba(255,122,69,0.10);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Highlight a settings group jumped to from elsewhere */
+.settings-flash { animation: settings-flash 1.8s ease; border-radius: 12px; }
+@keyframes settings-flash {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,122,69,0); }
+  15%, 60% { box-shadow: 0 0 0 3px rgba(255,122,69,0.85); }
+}
+
+/* Checkbox row in settings */
+.check-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; }
+.check-row input { width: 22px; height: 22px; accent-color: var(--accent); }
+
+/* Trash */
+.trash-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; margin: 8px 0; }
+.trash-row { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; }
+.trash-row-info { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.trash-row-info strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trash-row .btn.small { flex: 0 0 auto; padding: 8px 14px; font-size: 13px; }
+
+/* Backup buttons */
+.btn-accent { background: var(--accent); color: #fff; border: 1px solid var(--accent); }
+.btn-qr {
+  width: 100%;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: #fff; border: none;
+  font-weight: 800; font-size: 15.5px; padding: 15px;
+  box-shadow: 0 4px 14px rgba(30,58,95,0.28);
+}
+.btn-qr:active { opacity: 0.9; }
+
+/* Centre the QR on the sending screen */
+.send-qr-container { margin: 0 auto; }
+.fs-code-stage { display: flex; align-items: center; justify-content: center; }

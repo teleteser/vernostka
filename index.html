@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Vernostka - verzia v23 -->
+<!-- Vernostka - verzia v24 -->
 <html lang="sk">
 <head>
 <meta charset="UTF-8">
@@ -29,7 +29,10 @@
     <div class="search-row">
       <div class="search-box">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        <input type="search" id="search-input" autocomplete="off" data-i18n-placeholder="search_placeholder" placeholder="Hladat kartu...">
+        <input type="text" id="search-input" inputmode="search" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" data-i18n-placeholder="search_placeholder" placeholder="Hladat kartu...">
+        <button id="search-clear-btn" class="search-clear-btn" aria-label="X" hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>
+        </button>
       </div>
       <button id="sort-btn" class="icon-btn" aria-label="Sort" title="Sort">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M6 12h12M10 18h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -39,7 +42,7 @@
       </button>
     </div>
 
-    <p id="search-scope-note" class="hint center search-scope-note" data-i18n="search_scope_note" hidden>Hlada sa vo vsetkych kartach.</p>
+    <button id="search-scope-note" class="search-scope-note" data-i18n="search_scope_note" hidden>Hlada sa vo vsetkych kartach.</button>
     <div id="category-chips" class="chip-row"></div>
 
     <div id="cards-list" class="cards-list"></div>
@@ -97,13 +100,23 @@
         </div>
       </div>
 
-      <div class="settings-group">
+      <div class="settings-group" id="search-settings-group">
         <h3 data-i18n="settings_search">Vyhladavanie</h3>
         <div class="segmented" id="search-scope-segmented">
           <button data-value="all" data-i18n="search_scope_all">Vo vsetkych kartach</button>
           <button data-value="category" data-i18n="search_scope_category">Len vo zvolenej kategorii</button>
         </div>
         <p class="hint" data-i18n="search_scope_hint">Pri hladani vo vsetkych kartach sa zvoleny filter kategorie docasne ignoruje, aby sa karta nestratila.</p>
+        <label class="check-row"><input type="checkbox" id="search-scope-dismiss"><span data-i18n="search_scope_dismiss">Uz neupozornovat pod vyhladavacim polom</span></label>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="settings_recent_first">Naposledy pouzite navrchu</h3>
+        <div class="segmented" id="recent-first-segmented">
+          <button data-value="on" data-i18n="vibration_on">Zapnute</button>
+          <button data-value="off" data-i18n="vibration_off">Vypnute</button>
+        </div>
+        <p class="hint" data-i18n="recent_first_hint">Pri radeni podla pouzitia sa karty otvorene dnes a vcera zobrazia na zaciatku zoznamu.</p>
       </div>
 
       <div class="settings-group">
@@ -143,12 +156,25 @@
         <p id="folder-status" class="hint hint-success" hidden></p>
         <p id="last-backup-status" class="hint"></p>
         <div class="btn-row">
-          <button id="backup-now-btn" class="btn btn-secondary" data-i18n="backup_now">Zalohovat teraz</button>
-          <button id="export-backup-btn" class="btn btn-secondary" data-i18n="backup_export_manual">Exportovat zalohu</button>
+          <button id="backup-now-btn" class="btn btn-success" data-i18n="backup_now">Zalohovat teraz</button>
+          <button id="export-backup-btn" class="btn btn-accent" data-i18n="backup_export_manual">Exportovat zalohu</button>
         </div>
-        <button id="send-all-qr-btn" class="btn btn-secondary" data-i18n="send_all_qr">Prenos vsetkych kariet cez QR</button>
+        <button id="send-all-qr-btn" class="btn btn-qr" data-i18n="send_all_qr">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/><path d="M14 14h3v3h-3zM19 19h2v2h-2zM14 19h2v2h-2zM19 14h2v2h-2z" fill="currentColor"/></svg>
+          <span data-i18n="send_all_qr">Prenos vsetkych kariet cez QR</span>
+        </button>
         <button id="import-backup-btn" class="btn btn-primary" data-i18n="backup_import">Obnovit zo zalohy</button>
         <input type="file" id="import-file-input" accept="application/json,.json,.txt,text/plain" hidden>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="settings_trash">Kos</h3>
+        <p id="trash-count" class="hint"></p>
+        <div id="trash-list" class="trash-list"></div>
+        <div class="btn-row">
+          <button id="trash-restore-all-btn" class="btn btn-success" data-i18n="trash_restore_all" hidden>Vratit vsetko</button>
+          <button id="trash-empty-btn" class="btn btn-danger" data-i18n="trash_empty_button" hidden>Vysypat kos</button>
+        </div>
       </div>
 
       <div class="settings-group">
@@ -227,7 +253,7 @@
       <div id="manual-pane" class="capture-pane" hidden>
         <div class="code-preview" id="manual-code-preview"></div>
         <label class="field-label" data-i18n="card_code_label">Cislo / kod karty</label>
-        <input type="text" id="field-code" name="loyalty-code-manual" autocomplete="new-password" autocorrect="off" spellcheck="false" data-i18n-placeholder="card_code_placeholder" placeholder="Naskenuj alebo zadaj cislo">
+        <input type="text" id="field-code" name="loyalty-code-manual" autocomplete="new-password" autocorrect="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-i18n-placeholder="card_code_placeholder" placeholder="Naskenuj alebo zadaj cislo">
         <label class="field-label" data-i18n="code_type_label">Typ kodu</label>
         <select id="field-code-type"></select>
       </div>
@@ -236,7 +262,7 @@
         <label class="field-label" data-i18n="store_name_label">Nazov obchodu</label>
         <div class="store-name-row">
           <div id="store-logo-preview" class="store-logo-preview"></div>
-          <input type="text" id="field-store-name" autocomplete="off" data-i18n-placeholder="store_name_placeholder" placeholder="napr. Lidl">
+          <input type="text" id="field-store-name" name="vk-store-name" autocomplete="new-password" autocorrect="off" autocapitalize="words" spellcheck="false" data-lpignore="true" data-i18n-placeholder="store_name_placeholder" placeholder="napr. Lidl">
         </div>
         <div id="store-suggestions" class="store-suggestions"></div>
 

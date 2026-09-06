@@ -1,6 +1,6 @@
 // Vernostka DB layer - IndexedDB wrapper
 const DB_NAME = 'vernostka-db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let _dbPromise = null;
 
@@ -27,6 +27,11 @@ function openDB() {
       }
       if (!db.objectStoreNames.contains('transfers')) {
         db.createObjectStore('transfers', { keyPath: 'id' });
+      }
+      // Deleted cards and categories are parked here first, so nothing is ever lost by one
+      // wrong tap. Each entry: { id, kind: 'card'|'category', data, deletedAt }.
+      if (!db.objectStoreNames.contains('trash')) {
+        db.createObjectStore('trash', { keyPath: 'id' });
       }
     };
     req.onsuccess = (e) => resolve(e.target.result);
@@ -120,6 +125,29 @@ const DB = {
     store.clear();
     entries.forEach((e) => store.put(e));
     return new Promise((res, rej) => { t.oncomplete = () => res(); t.onerror = () => rej(t.error); });
+  },
+
+  // ---- Trash ----
+  async getAllTrash() {
+    const t = await tx(['trash']);
+    return reqToPromise(t.objectStore('trash').getAll());
+  },
+  async putTrash(entry) {
+    const t = await tx(['trash'], 'readwrite');
+    t.objectStore('trash').put(entry);
+    return entry;
+  },
+  async getTrashEntry(id) {
+    const t = await tx(['trash']);
+    return reqToPromise(t.objectStore('trash').get(id));
+  },
+  async deleteTrashEntry(id) {
+    const t = await tx(['trash'], 'readwrite');
+    t.objectStore('trash').delete(id);
+  },
+  async clearTrash() {
+    const t = await tx(['trash'], 'readwrite');
+    t.objectStore('trash').clear();
   },
 
   // ---- Categories ----
