@@ -1,4 +1,4 @@
-// Vernostka main app controller - verzia v31
+// Vernostka main app controller - verzia v32
 
 // Chrome fires beforeinstallprompt very early - often before the app has finished starting
 // up - and only once. Catch it here, at script level, so the "Install now" button in the
@@ -121,6 +121,7 @@ const App = {
     // Each category remembers how it was sorted the last time it was open.
     this.sortByCategory = await DB.getSetting('sortByCategory', {}) || {};
     this.defaultSort = this.currentSort;
+    // Empty means "not set yet" - the field then shows the built-in name.
     this.appTitle = await DB.getSetting('appTitle', '');
     this.showAppTitle = await DB.getSetting('showAppTitle', true);
     if (this.sortByCategory[this.currentCategoryFilter]) this.currentSort = this.sortByCategory[this.currentCategoryFilter];
@@ -136,14 +137,20 @@ const App = {
   },
 
   // The heading above the card list: own name, or hidden entirely.
+  // Empty field = the built-in name; a field holding only spaces = no name at all.
+  headerTitleText() {
+    if (this.appTitle === '' || this.appTitle === null || this.appTitle === undefined) return i18n.t('appName');
+    if (this.appTitle.trim() === '') return '';
+    return this.appTitle;
+  },
+
   applyAppTitleToDom() {
     const el = document.getElementById('app-title');
     const header = el ? el.closest('.topbar') : null;
-    const name = (this.appTitle && this.appTitle.trim()) || i18n.t('appName');
-    if (el) el.textContent = name;
+    if (el) el.textContent = this.headerTitleText();
     if (header) header.hidden = !this.showAppTitle;
     const input = document.getElementById('app-title-input');
-    if (input && document.activeElement !== input) input.value = this.appTitle || '';
+    if (input && document.activeElement !== input) input.value = this.appTitle || i18n.t('appName');
     const check = document.getElementById('app-title-show');
     if (check) check.checked = !!this.showAppTitle;
     // With the heading switched off there is nothing to name, so the name field is hidden.
@@ -2157,13 +2164,24 @@ const App = {
       await this.renderCardsList();
     });
 
-    document.getElementById('app-title-save').addEventListener('click', async () => {
+    // The heading follows the field as it is typed - no separate save button.
+    document.getElementById('app-title-input').addEventListener('input', async (e) => {
+      const raw = e.target.value;
+      this.appTitle = raw === i18n.t('appName') ? '' : raw;
+      const el = document.getElementById('app-title');
+      if (el) el.textContent = this.headerTitleText();
+      clearTimeout(this._appTitleSaveTimer);
+      this._appTitleSaveTimer = setTimeout(() => DB.setSetting('appTitle', this.appTitle), 400);
+    });
+    // Leaving the field empty brings the built-in name back.
+    document.getElementById('app-title-input').addEventListener('blur', async () => {
       const input = document.getElementById('app-title-input');
-      this.appTitle = input.value.trim();
-      await DB.setSetting('appTitle', this.appTitle);
-      input.blur();
+      if (input.value === '') {
+        this.appTitle = '';
+        await DB.setSetting('appTitle', '');
+        input.value = i18n.t('appName');
+      }
       this.applyAppTitleToDom();
-      this.toast(i18n.t('app_title_saved'));
     });
     document.getElementById('app-title-show').addEventListener('change', async (e) => {
       this.showAppTitle = e.target.checked;

@@ -553,7 +553,13 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   cursor: grab;
 }
 .fs-code-container.dragging { cursor: grabbing; }
-.fs-code-container.code-square { aspect-ratio: 1 / 1; }
+/* A square code must fit the stage's HEIGHT as well - on a short screen it used to run from
+   edge to edge vertically while there was room to spare left and right. */
+.fs-code-container.code-square {
+  aspect-ratio: 1 / 1;
+  max-width: calc(100% - 28px);
+  max-height: calc(100% - 28px);
+}
 /* Absolutely-positioned elements need an explicit height for a 100%-height child (the
    stretched barcode svg) to resolve against - auto height wouldn't work here. */
 .fs-code-container.code-tall { height: 30vh; }
@@ -993,3 +999,7 @@ body.modal-open #app { overflow: hidden; }
 }
 .install-warning strong { display: block; color: var(--danger); font-size: 15.5px; margin-bottom: 6px; }
 .install-warning p { font-size: 14.5px; line-height: 1.45; margin-bottom: 10px; }
+
+/* The fullscreen code screen keeps its own centring (the code is absolutely positioned and
+   draggable), so undo the flex centring added for the QR sending screen. */
+#modal-fullscreen-code .fs-code-stage { display: block; }

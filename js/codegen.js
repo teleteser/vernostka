@@ -125,6 +125,29 @@ function renderCode(container, value, type, options = {}) {
       }
     }
   } catch (err) {
+    // A QR code that failed to build must not fall back to a 1D barcode - a barcode cannot
+    // hold that much data either, and the result was the raw text on screen. Retry once with
+    // the lowest error-correction level, which fits noticeably more data.
+    if ((type || '').toUpperCase() === 'QR') {
+      try {
+        container.innerHTML = '';
+        const holder = document.createElement('div');
+        holder.className = 'qr-holder';
+        container.appendChild(holder);
+        // eslint-disable-next-line no-undef
+        new QRCode(holder, {
+          text: utf8ByteString(value),
+          width: options.width || 300,
+          height: options.height || 300,
+          correctLevel: QRCode.CorrectLevel.L
+        });
+        if (options.responsive) container.classList.add('code-square');
+        return;
+      } catch (err3) {
+        container.innerHTML = `<div class="code-render-error">${value}</div>`;
+        return;
+      }
+    }
     // Fallback: if format-specific rendering fails (e.g. invalid EAN checksum), use CODE128,
     // which accepts arbitrary ASCII and therefore always succeeds for scanned/typed values.
     console.warn('renderCode fallback to CODE128', err);

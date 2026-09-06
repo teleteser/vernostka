@@ -11,6 +11,15 @@ const Backup = {
   // so the scanner can tell it apart from a normal loyalty-card code.
   QR_CARD_PREFIX: 'VRNK1:',
 
+  // QR codes carry the payload as bytes, so a letter with a diacritic (Iné, Drogéria...)
+  // takes two bytes instead of one. Escaping every non-ASCII character as \uXXXX keeps the
+  // JSON valid (JSON.parse understands the escapes) AND makes one character exactly one
+  // byte, so the frames really are the size we calculated - otherwise the code could not be
+  // generated at all and only the raw text appeared on screen.
+  toAsciiJson(value) {
+    return JSON.stringify(value).replace(/[\u0080-\uFFFF]/g, (ch) => '\\u' + ('0000' + ch.charCodeAt(0).toString(16)).slice(-4));
+  },
+
   encodeCardForQr(card, categoryLabel) {
     const compact = {
       n: card.storeName || '',
@@ -22,7 +31,7 @@ const Backup = {
       lc: card.logoColor || '',
       tc: card.logoTextColor || ''
     };
-    return this.QR_CARD_PREFIX + JSON.stringify(compact);
+    return this.QR_CARD_PREFIX + this.toAsciiJson(compact);
   },
 
   decodeCardFromQr(text) {
@@ -78,7 +87,7 @@ const Backup = {
   // the same size and module count, so the picture no longer appears to grow/shrink between
   // frames - that jumping is what made the receiving camera lose codes.
   buildBulkQrFrames(cardList) {
-    const payloadStr = JSON.stringify(cardList);
+    const payloadStr = this.toAsciiJson(cardList);
     if (payloadStr.length <= this.BULK_CHUNK_SIZE) {
       return [this.BULK_SINGLE_PREFIX + payloadStr];
     }
