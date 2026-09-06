@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Vernostka - verzia v22 -->
+<!-- Vernostka - verzia v23 -->
 <html lang="sk">
 <head>
 <meta charset="UTF-8">
@@ -39,6 +39,7 @@
       </button>
     </div>
 
+    <p id="search-scope-note" class="hint center search-scope-note" data-i18n="search_scope_note" hidden>Hlada sa vo vsetkych kartach.</p>
     <div id="category-chips" class="chip-row"></div>
 
     <div id="cards-list" class="cards-list"></div>
@@ -53,8 +54,8 @@
         <button id="selection-cancel-btn" class="btn btn-danger" data-i18n="cancel">Zrusit</button>
       </div>
       <div class="selection-bar-row">
-        <button id="selection-assign-btn" class="btn btn-light" data-i18n="bulk_assign_button">Priradit kategoriu</button>
-        <button id="selection-send-btn" class="btn btn-light" data-i18n="send_button">Zdielat</button>
+        <button id="selection-assign-btn" class="btn btn-accent" data-i18n="bulk_assign_button">Priradit kategoriu</button>
+        <button id="selection-send-btn" class="btn btn-success" data-i18n="send_button">Zdielat</button>
       </div>
     </div>
 
@@ -94,6 +95,15 @@
           <button data-value="dark" data-i18n="theme_dark">Tmavy</button>
           <button data-value="system" data-i18n="theme_system">Podla systemu</button>
         </div>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="settings_search">Vyhladavanie</h3>
+        <div class="segmented" id="search-scope-segmented">
+          <button data-value="all" data-i18n="search_scope_all">Vo vsetkych kartach</button>
+          <button data-value="category" data-i18n="search_scope_category">Len vo zvolenej kategorii</button>
+        </div>
+        <p class="hint" data-i18n="search_scope_hint">Pri hladani vo vsetkych kartach sa zvoleny filter kategorie docasne ignoruje, aby sa karta nestratila.</p>
       </div>
 
       <div class="settings-group">
@@ -137,7 +147,7 @@
           <button id="export-backup-btn" class="btn btn-secondary" data-i18n="backup_export_manual">Exportovat zalohu</button>
         </div>
         <button id="send-all-qr-btn" class="btn btn-secondary" data-i18n="send_all_qr">Prenos vsetkych kariet cez QR</button>
-        <button id="import-backup-btn" class="btn btn-ghost" data-i18n="backup_import">Obnovit zo zalohy</button>
+        <button id="import-backup-btn" class="btn btn-primary" data-i18n="backup_import">Obnovit zo zalohy</button>
         <input type="file" id="import-file-input" accept="application/json,.json,.txt,text/plain" hidden>
       </div>
 

@@ -212,7 +212,9 @@ p { margin: 0.35em 0; }
 }
 .selection-bar-title strong { font-size: 22px; font-weight: 800; }
 .selection-bar .btn { width: auto; flex: 1; font-size: 15px; font-weight: 700; padding: 13px 10px; }
-.selection-bar .btn-light { background: #fff; color: var(--primary); border: none; }
+.selection-bar .btn-light { background: rgba(255,255,255,0.14); color: #fff; border: 1.5px solid rgba(255,255,255,0.55); }
+.selection-bar .btn-accent { background: var(--accent); color: #fff; border: none; }
+.selection-bar .btn-success { background: var(--success); color: #fff; border: none; }
 .selection-bar .btn-danger { background: var(--danger); color: #fff; border: none; }
 
 .send-qr-container { width: min(100%, 620px); background: #fff; border-radius: 12px; padding: 8px; display: flex; align-items: center; justify-content: center; }
@@ -780,3 +782,28 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 
 /* Total card count next to the categories heading in settings */
 .settings-total { font-weight: 600; color: var(--text-muted); text-transform: none; }
+
+/* Today / yesterday instead of a date */
+.day-label { color: var(--accent); font-weight: 800; letter-spacing: 0.02em; }
+
+/* Hold-to-confirm button: label on top, the "hold" hint underneath, never squashed */
+.btn.btn-hold { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; line-height: 1.2; white-space: normal; }
+.btn.btn-hold small { font-size: 11.5px; font-weight: 700; opacity: 0.9; text-transform: uppercase; }
+.modal-sheet.big .btn-row .btn.btn-hold { font-size: 16px; padding: 14px 10px; }
+
+/* Freeze the page behind a full-screen layer (iOS keyboard used to reveal it) */
+body.modal-open { overflow: hidden; touch-action: none; }
+body.modal-open #app { overflow: hidden; }
+
+/* Search scope note under the search box */
+.search-scope-note { margin: 0 20px 6px; color: var(--accent); font-weight: 700; }
+
+/* Sending screen: keep the code, the counter and the buttons inside the screen */
+.fs-code-stage { min-height: 0; }
+.send-qr-controls { flex-shrink: 0; }
+@media (max-height: 700px) {
+  .transfer-progress-text { font-size: 16px; margin-bottom: 4px; }
+  .progress-segment { max-height: 12px; }
+  .send-qr-controls .hint.center { display: none; }
+  .send-qr-controls .btn-primary { padding: 12px; font-size: 15px; }
+}

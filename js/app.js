@@ -1,4 +1,4 @@
-// Vernostka main app controller - verzia v22
+// Vernostka main app controller - verzia v23
 
 // Chrome fires beforeinstallprompt very early - often before the app has finished starting
 // up - and only once. Catch it here, at script level, so the "Install now" button in the
@@ -49,6 +49,7 @@ const App = {
 
     this.applyVibrationToDom();
     this.applyGpsToDom();
+    this.applySearchScopeToDom();
     this.updateInstallStatusUI();
     this.renderCategoryChips();
     this.renderCategorySelect();
@@ -85,7 +86,12 @@ const App = {
     if (!window.visualViewport) return;
     const resize = () => {
       document.querySelectorAll('.modal-full').forEach((m) => {
-        if (!m.hidden) m.style.height = window.visualViewport.height + 'px';
+        if (m.hidden) return;
+        // Pin the modal to the visible part of the page: with the keyboard open iOS keeps
+        // the page itself full-size, so without this the area under the modal showed (and
+        // scrolled) the cards list behind it.
+        m.style.height = window.visualViewport.height + 'px';
+        m.style.top = window.visualViewport.offsetTop + 'px';
       });
     };
     window.visualViewport.addEventListener('resize', resize);
@@ -101,6 +107,9 @@ const App = {
     // Off by default: locating the phone costs battery and is only needed for sorting by
     // distance, so it stays off until the person turns it on.
     this.gpsEnabled = await DB.getSetting('gps', false);
+    // 'all' = typing in the search box looks through every card, whatever category chip is
+    // selected; 'category' = search stays inside the selected category.
+    this.searchScope = await DB.getSetting('searchScope', 'all');
   },
 
   applyTheme() {
@@ -110,6 +119,12 @@ const App = {
     }
     document.documentElement.setAttribute('data-theme', effective);
     document.querySelectorAll('#theme-segmented button').forEach((b) => b.classList.toggle('active', b.dataset.value === this.theme));
+  },
+
+  applySearchScopeToDom() {
+    document.querySelectorAll('#search-scope-segmented button').forEach((b) => {
+      b.classList.toggle('active', b.dataset.value === this.searchScope);
+    });
   },
 
   applyGpsToDom() {
@@ -132,6 +147,7 @@ const App = {
     document.querySelectorAll('#lang-segmented button').forEach((b) => b.classList.toggle('active', b.dataset.value === this.lang));
     this.applyVibrationToDom();
     this.applyGpsToDom();
+    this.applySearchScopeToDom();
     const qrPlayBtn = document.getElementById('send-qr-play-btn');
     if (qrPlayBtn) qrPlayBtn.textContent = i18n.t(this._bulkQrPlaying ? 'send_qr_pause' : 'send_qr_play');
     this.renderCategoryChips();
@@ -464,9 +480,19 @@ const App = {
     this._sendQrStartedAt = Date.now();
     this._sendQrCardNames = cardList.map((c) => c.n || i18n.t('untitled_card'));
     document.getElementById('modal-send-qr').hidden = false;
+    this.updateBodyScrollLock();
     void document.getElementById('modal-send-qr').offsetHeight;
     document.getElementById('send-qr-nav').hidden = this._bulkQrFrames.length <= 1;
     this.renderBulkQrFrame();
+    // Re-measure after the layout settles and whenever the screen changes (rotation, iOS
+    // toolbars appearing) - otherwise the code can end up bigger than the space it has.
+    requestAnimationFrame(() => this.renderBulkQrFrame());
+    if (!this._bulkQrResizeHandler) {
+      this._bulkQrResizeHandler = () => { if (!document.getElementById('modal-send-qr').hidden) this.renderBulkQrFrame(); };
+      window.addEventListener('resize', this._bulkQrResizeHandler);
+      window.addEventListener('orientationchange', this._bulkQrResizeHandler);
+      if (window.visualViewport) window.visualViewport.addEventListener('resize', this._bulkQrResizeHandler);
+    }
     if (this._bulkQrFrames.length > 1) this.setBulkQrPlaying(true);
     else this.setBulkQrPlaying(false);
   },
@@ -501,7 +527,14 @@ const App = {
   async endSendQrTransfer() {
     clearInterval(this._bulkQrTimer);
     this._bulkQrPlaying = false;
+    if (this._bulkQrResizeHandler) {
+      window.removeEventListener('resize', this._bulkQrResizeHandler);
+      window.removeEventListener('orientationchange', this._bulkQrResizeHandler);
+      if (window.visualViewport) window.visualViewport.removeEventListener('resize', this._bulkQrResizeHandler);
+      this._bulkQrResizeHandler = null;
+    }
     document.getElementById('modal-send-qr').hidden = true;
+    this.updateBodyScrollLock();
     if (this._sendQrStartedAt) {
       const durationMs = Date.now() - this._sendQrStartedAt;
       await DB.addTransferLog({
@@ -529,7 +562,7 @@ const App = {
         row.className = 'history-row';
         const names = (log.cardNames || []).slice(0, 3).join(', ') + ((log.cardNames || []).length > 3 ? '...' : '');
         const seconds = Math.round((log.durationMs || 0) / 1000);
-        row.innerHTML = `<span>${this.formatLastUsed(log.timestamp)}</span><span class="type">${log.cardCount || 0}x - ${seconds}s${names ? ' - ' + this.escapeHtml(names) : ''}</span>`;
+        row.innerHTML = `<span>${this.formatLastUsedHtml(log.timestamp)}</span><span class="type">${log.cardCount || 0}x - ${seconds}s${names ? ' - ' + this.escapeHtml(names) : ''}</span>`;
         listEl.appendChild(row);
       });
     }
@@ -543,11 +576,17 @@ const App = {
     // Draw the code as large as the screen allows (the frames are short, so the squares stay
     // big) and with medium error correction, so a slightly blurred or angled shot still
     // decodes instead of forcing the other phone to hunt for the right angle.
-    // Fit the code to whatever room the stage actually has, so the progress line and the
-    // buttons below it never get pushed off the screen.
+    // Fit the code to the room the stage really has right now (measured, not estimated), so
+    // on a small phone the bottom of the code is never hidden behind the progress bar.
     const stage = document.querySelector('#modal-send-qr .fs-code-stage');
-    const stageH = stage && stage.clientHeight ? stage.clientHeight - 16 : window.innerHeight * 0.5;
-    const size = Math.max(240, Math.min(Math.floor(Math.min(window.innerWidth - 16, stageH)), 620));
+    const rect = stage ? stage.getBoundingClientRect() : null;
+    const stageH = rect && rect.height ? rect.height - 12 : window.innerHeight * 0.45;
+    const stageW = rect && rect.width ? rect.width - 12 : window.innerWidth - 16;
+    const size = Math.max(200, Math.min(Math.floor(Math.min(stageW, stageH)), 620));
+    // The canvas is styled width:100%, so the container itself has to be capped - otherwise
+    // it would stretch to the full screen width and the bottom of the code would slide
+    // behind the progress bar on a short screen.
+    container.style.maxWidth = size + 'px';
     renderCode(container, frame, 'QR', { width: size, height: size, correctLevel: 'M' });
     const wrap = document.getElementById('send-qr-progress-wrap');
     const progressEl = document.getElementById('send-qr-progress');
@@ -596,11 +635,16 @@ const App = {
     const emptyEl = document.getElementById('empty-state');
     const search = document.getElementById('search-input').value.trim().toLowerCase();
 
+    // While searching across all cards, the category filter is deliberately ignored so a
+    // card is never "missing" just because a different chip happens to be selected.
+    const ignoreCategory = search && this.searchScope === 'all';
     let filtered = this.cards.filter((c) => {
-      if (this.currentCategoryFilter !== 'all' && this.cardCategoryIds(c).indexOf(this.currentCategoryFilter) === -1) return false;
+      if (!ignoreCategory && this.currentCategoryFilter !== 'all' && this.cardCategoryIds(c).indexOf(this.currentCategoryFilter) === -1) return false;
       if (search && !c.storeName.toLowerCase().includes(search)) return false;
       return true;
     });
+    const scopeNote = document.getElementById('search-scope-note');
+    if (scopeNote) scopeNote.hidden = !(ignoreCategory && this.currentCategoryFilter !== 'all');
 
     filtered = this.sortCards(filtered);
     this._lastFilteredCardIds = filtered.map((c) => c.id);
@@ -661,7 +705,7 @@ const App = {
       <div class="card-logo" ${logoStyle}>${logoInner}</div>
       <div class="card-row-info">
         <div class="card-row-name">${displayName}${draftBadge}</div>
-        <div class="card-row-meta">${totalActivity}x ${i18n.t('shown_label_row')} · ${this.formatLastUsed(this.mostRecentActivity(card))}</div>
+        <div class="card-row-meta">${totalActivity}x ${i18n.t('shown_label_row')} · ${this.formatLastUsedHtml(this.mostRecentActivity(card))}</div>
       </div>
       <div class="card-row-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     `;
@@ -808,6 +852,30 @@ const App = {
     if (len <= 14) return '10px';
     return '8.5px';
   },
+  // "DNES 15:33" / "VCERA 15:33" (highlighted) instead of a date for recent activity.
+  dayLabelFor(ts) {
+    if (!ts) return null;
+    const d = new Date(ts);
+    const today = new Date();
+    const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    if (sameDay(d, today)) return i18n.t('day_today');
+    const yesterday = new Date(today.getTime() - 24 * 3600 * 1000);
+    if (sameDay(d, yesterday)) return i18n.t('day_yesterday');
+    return null;
+  },
+
+  formatTimeOnly(ts) {
+    return new Date(ts).toLocaleTimeString(this.lang === 'sk' ? 'sk-SK' : 'en-US', { hour: '2-digit', minute: '2-digit' });
+  },
+
+  // Same as formatLastUsed(), but today/yesterday are shown as a highlighted word.
+  formatLastUsedHtml(ts) {
+    if (!ts) return this.escapeHtml(i18n.t('never_used'));
+    const label = this.dayLabelFor(ts);
+    if (label) return `<span class="day-label">${this.escapeHtml(label)}</span> ${this.escapeHtml(this.formatTimeOnly(ts))}`;
+    return this.escapeHtml(this.formatLastUsed(ts));
+  },
+
   formatLastUsed(ts) {
     if (!ts) return i18n.t('never_used');
     const d = new Date(ts);
@@ -1638,7 +1706,7 @@ const App = {
     this.showModal('modal-detail');
     void document.getElementById('modal-detail').offsetHeight;
     this.renderDetail(card);
-    this.onDataChanged();
+    this.onDataChanged({ minor: true });
   },
 
   async renderDetail(card) {
@@ -1653,9 +1721,7 @@ const App = {
     }
     document.getElementById('detail-history-section').hidden = true;
     document.getElementById('detail-uses').textContent = this.cardActivityCount(card) + ' x';
-    document.getElementById('detail-last-used').textContent = this._detailPreviousActivity
-      ? this.formatLastUsed(this._detailPreviousActivity)
-      : i18n.t('never_used');
+    document.getElementById('detail-last-used').innerHTML = this.formatLastUsedHtml(this._detailPreviousActivity);
     const noteTitle = document.getElementById('detail-note-title');
     const noteEl = document.getElementById('detail-note');
     if (card.note) { noteTitle.hidden = false; noteEl.textContent = card.note; }
@@ -1676,7 +1742,7 @@ const App = {
         else if (h.type === 'edited') label = i18n.t('history_edited');
         const top = document.createElement('div');
         top.className = 'history-row-top';
-        top.innerHTML = `<span>${this.formatLastUsed(h.timestamp)}</span><span class="type">${label}${h.durationMs ? ' · ' + Math.round(h.durationMs / 1000) + 's' : ''}</span>`;
+        top.innerHTML = `<span>${this.formatLastUsedHtml(h.timestamp)}</span><span class="type">${label}${h.durationMs ? ' · ' + Math.round(h.durationMs / 1000) + 's' : ''}</span>`;
         row.appendChild(top);
         if (h.type === 'edited' && h.changes) {
           const changesEl = document.createElement('div');
@@ -1795,7 +1861,8 @@ const App = {
       this._fsHistoryEntry = null;
       if (this._detailCard) this.renderDetail(this._detailCard);
     }
-    this.onDataChanged();
+    // Showing a code only bumps the "shown" counters - that is not an unsaved change.
+    this.onDataChanged({ minor: true });
   },
 
   // ---------------- Settings ----------------
@@ -1815,6 +1882,15 @@ const App = {
         this.applyTheme();
       });
     });
+    document.querySelectorAll('#search-scope-segmented button').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        this.searchScope = btn.dataset.value;
+        await DB.setSetting('searchScope', this.searchScope);
+        this.applySearchScopeToDom();
+        await this.renderCardsList();
+      });
+    });
+
     document.getElementById('settings-install-btn').addEventListener('click', () => this.openInstallSheet());
 
     document.querySelectorAll('#gps-segmented button').forEach((btn) => {
@@ -1918,7 +1994,7 @@ const App = {
         i18n.t('backup_before_reset_title'),
         i18n.t('backup_before_reset_desc'),
         [
-          { label: i18n.t('cancel'), value: 'cancel', className: 'btn-ghost' },
+          { label: i18n.t('cancel'), value: 'cancel', className: 'btn-success' },
           { label: i18n.t('backup_then_delete'), value: 'backup', className: 'btn-secondary' },
           { label: i18n.t('delete_without_backup'), value: 'delete', className: 'btn-danger', hold: true }
         ],
@@ -2181,11 +2257,15 @@ const App = {
 
   // Called after any data mutation: schedules silent Android backup, or flags
   // "unsaved changes" reminder for iOS/unsupported browsers.
-  async onDataChanged() {
+  // opts.minor = the data changed only because a card was viewed (counters, timestamps).
+  // Those never deserve a "you have unsaved changes" prompt - the person changed nothing.
+  async onDataChanged(opts) {
+    const minor = !!(opts && opts.minor);
     if (Backup.hasActiveFolderPermission()) {
       Backup.scheduleDebouncedBackup();
       setTimeout(() => this.updateBackupStatusUI(), 8000);
     } else if (!Backup.supportsFS) {
+      if (minor) return;
       Backup.markDirty();
       // Nothing left to back up (all cards deleted, or the last one removed) - asking to
       // save a backup of an empty list would only be in the way.
@@ -2283,9 +2363,22 @@ const App = {
     }
     const el = document.getElementById(id);
     el.style.height = '';
+    el.style.top = '';
     el.hidden = false;
+    this.updateBodyScrollLock();
   },
-  hideModal(id) { document.getElementById(id).hidden = true; },
+  hideModal(id) {
+    document.getElementById(id).hidden = true;
+    this.updateBodyScrollLock();
+  },
+
+  // With a full-screen modal open (and especially with the iOS keyboard up, which shrinks
+  // the modal) the cards list behind it could still be seen and scrolled. Freeze the page
+  // behind whenever any full-screen layer is showing.
+  updateBodyScrollLock() {
+    const anyOpen = !!document.querySelector('.modal-full:not([hidden]), .fullscreen-code:not([hidden])');
+    document.body.classList.toggle('modal-open', anyOpen);
+  },
 
   bindConfirmModal() {
     // handled dynamically via confirmDialog()
@@ -2342,11 +2435,19 @@ const App = {
   // it never stands in the way.
   infoDialog(title, desc, autoCloseMs = 10000) {
     const promise = this.threeWayDialog(title, desc, [{ label: i18n.t('ok'), value: 'ok', className: 'btn-success' }]);
-    clearTimeout(this._infoAutoCloseTimer);
-    this._infoAutoCloseTimer = setTimeout(() => {
+    clearInterval(this._infoAutoCloseTimer);
+    let left = Math.round(autoCloseMs / 1000);
+    const tick = () => {
       const okBtn = document.querySelector('#modal-confirm .btn-row .btn-success');
-      if (okBtn && !document.getElementById('modal-confirm').hidden) okBtn.click();
-    }, autoCloseMs);
+      const open = okBtn && !document.getElementById('modal-confirm').hidden;
+      if (!open) { clearInterval(this._infoAutoCloseTimer); return; }
+      // Visible countdown, so the sheet closing on its own is never a surprise.
+      okBtn.textContent = i18n.t('ok') + ' (' + left + ')';
+      if (left <= 0) { clearInterval(this._infoAutoCloseTimer); okBtn.click(); return; }
+      left--;
+    };
+    tick();
+    this._infoAutoCloseTimer = setInterval(tick, 1000);
     return promise;
   },
 
@@ -2358,13 +2459,14 @@ const App = {
       document.getElementById('confirm-warning-icon').hidden = !danger;
       document.getElementById('confirm-warning').hidden = !danger;
       const btnRow = document.querySelector('#modal-confirm .btn-row');
-      // More than three choices never fit side by side on a phone - stack them.
-      btnRow.classList.toggle('stacked', buttons.length > 3);
+      // Three or more choices never fit side by side on a phone - stack them full width.
+      btnRow.classList.toggle('stacked', buttons.length > 2);
       btnRow.innerHTML = '';
       buttons.forEach((b) => {
         const btn = document.createElement('button');
         btn.className = 'btn ' + (b.className || 'btn-ghost') + (b.disabled ? ' btn-struck' : '') + (b.hold ? ' btn-hold' : '');
-        btn.textContent = b.hold ? b.label + ' (' + i18n.t('hold_to_confirm') + ')' : b.label;
+        if (b.hold) btn.innerHTML = `${this.escapeHtml(b.label)}<small>${this.escapeHtml(i18n.t('hold_to_confirm'))}</small>`;
+        else btn.textContent = b.label;
         if (b.disabled) btn.disabled = true;
         const choose = () => {
           if (b.disabled) return;
